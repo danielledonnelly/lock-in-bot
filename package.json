@@ -1,0 +1,16 @@
+{
+  "name": "lock-in-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot to help Dani lock in",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.1",
+    "node-fetch": "^2.7.0",
+    "@discordjs/rest": "^2.2.0",
+    "discord-api-types": "^0.37.64"
+  }
+} 
