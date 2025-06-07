@@ -20,8 +20,15 @@ async function checkCommitStatus() {
     const today = new Date().toISOString().split('T')[0];
     console.log(`Checking commits for ${today}...`);
     try {
-        const response = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events`);
+        // Use GitHub API with authentication
+        const response = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events`, {
+            headers: {
+                'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
         const events = await response.json();
+        console.log('GitHub response:', JSON.stringify(events.slice(0, 3), null, 2));
         const hasCommitted = events.some(event => event.type === 'PushEvent' && event.created_at.startsWith(today));
         console.log(`Commit status: ${hasCommitted ? 'Found commit' : 'No commit found'}`);
         return hasCommitted;
@@ -39,8 +46,8 @@ async function updateUserMuteStatus(shouldMute) {
         
         if (shouldMute) {
             console.log(`Attempting to mute ${member.user.tag}...`);
-            // Set timeout for 24 hours (in milliseconds)
-            await member.timeout(24 * 60 * 60 * 1000, 'No commit today');
+            // Set timeout for 1 hour (in milliseconds)
+            await member.timeout(60 * 60 * 1000, 'No commit today');
             console.log(`Muted ${member.user.tag} - No commit today`);
         } else {
             console.log(`Attempting to unmute ${member.user.tag}...`);
@@ -79,6 +86,11 @@ client.on('messageCreate', async (message) => {
         const hasCommitted = await checkCommitStatus();
         await updateUserMuteStatus(!hasCommitted);
         message.reply(`Commit status: ${hasCommitted ? 'Found commit' : 'No commit found'}`);
+    }
+
+    if (message.content === '!test') {
+        console.log('Test command received');
+        message.reply('Bot is working! 🎉');
     }
 });
 
