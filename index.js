@@ -13,7 +13,7 @@ const client = new Client({
 
 const GITHUB_USERNAME = 'danielledonnelly';
 const DISCORD_USER_ID = '480415224164253707';
-const SERVER_ID = '961813532092006440';
+const SERVER_ID = '497544520695808000';
 
 // Function to check if user has committed today
 async function checkCommitStatus() {
