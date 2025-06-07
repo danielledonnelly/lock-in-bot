@@ -20,20 +20,38 @@ async function checkCommitStatus() {
     const today = new Date().toISOString().split('T')[0];
     console.log(`Checking commits for ${today}...`);
     try {
-        // Use GitHub API with authentication
-        const response = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events`, {
+        // Search for commits by the user from today
+        const query = `author:${GITHUB_USERNAME} committer-date:${today}`;
+        const response = await fetch(`https://api.github.com/search/commits?q=${encodeURIComponent(query)}`, {
             headers: {
                 'Authorization': `token ${process.env.GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json'
+                'Accept': 'application/vnd.github.cloak-preview+json'
             }
         });
-        const events = await response.json();
-        console.log('GitHub response:', JSON.stringify(events.slice(0, 3), null, 2));
-        const hasCommitted = events.some(event => event.type === 'PushEvent' && event.created_at.startsWith(today));
+
+        if (!response.ok) {
+            console.error('GitHub API Error:', {
+                status: response.status,
+                statusText: response.statusText
+            });
+            const errorText = await response.text();
+            console.error('Error details:', errorText);
+            return false;
+        }
+
+        const data = await response.json();
+        console.log('GitHub response:', JSON.stringify(data, null, 2));
+        
+        const hasCommitted = data.total_count > 0;
+        console.log(`Found ${data.total_count} commits today`);
         console.log(`Commit status: ${hasCommitted ? 'Found commit' : 'No commit found'}`);
         return hasCommitted;
     } catch (error) {
         console.error('Error checking GitHub commits:', error);
+        console.error('Full error details:', {
+            message: error.message,
+            stack: error.stack
+        });
         return false;
     }
 }
