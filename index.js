@@ -38,14 +38,18 @@ async function updateUserMuteStatus(shouldMute) {
         const member = await guild.members.fetch(DISCORD_USER_ID);
         
         if (shouldMute) {
-            await member.timeout(null, 'No commit today');
+            console.log(`Attempting to mute ${member.user.tag}...`);
+            // Set timeout for 24 hours (in milliseconds)
+            await member.timeout(24 * 60 * 60 * 1000, 'No commit today');
             console.log(`Muted ${member.user.tag} - No commit today`);
         } else {
-            await member.timeout(null);
+            console.log(`Attempting to unmute ${member.user.tag}...`);
+            await member.timeout(0); // Remove timeout
             console.log(`Unmuted ${member.user.tag} - Commit found`);
         }
     } catch (error) {
         console.error('Error updating mute status:', error);
+        console.error('Full error:', error);
     }
 }
 
