@@ -18,10 +18,13 @@ const SERVER_ID = '961813532092006440';
 // Function to check if user has committed today
 async function checkCommitStatus() {
     const today = new Date().toISOString().split('T')[0];
+    console.log(`Checking commits for ${today}...`);
     try {
         const response = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events`);
         const events = await response.json();
-        return events.some(event => event.type === 'PushEvent' && event.created_at.startsWith(today));
+        const hasCommitted = events.some(event => event.type === 'PushEvent' && event.created_at.startsWith(today));
+        console.log(`Commit status: ${hasCommitted ? 'Found commit' : 'No commit found'}`);
+        return hasCommitted;
     } catch (error) {
         console.error('Error checking GitHub commits:', error);
         return false;
@@ -49,16 +52,30 @@ async function updateUserMuteStatus(shouldMute) {
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
     
-    // Check commit status every hour
+    // Check commit status every 30 seconds for testing
     setInterval(async () => {
+        console.log('Running scheduled check...');
         const hasCommitted = await checkCommitStatus();
         await updateUserMuteStatus(!hasCommitted);
-    }, 3600000); // 1 hour in milliseconds
+    }, 30000); // 30 seconds for testing
     
     // Initial check
+    console.log('Running initial check...');
     checkCommitStatus().then(hasCommitted => {
         updateUserMuteStatus(!hasCommitted);
     });
+});
+
+// Add message event to test bot is working
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+    
+    if (message.content === '!check') {
+        console.log('Manual check requested...');
+        const hasCommitted = await checkCommitStatus();
+        await updateUserMuteStatus(!hasCommitted);
+        message.reply(`Commit status: ${hasCommitted ? 'Found commit' : 'No commit found'}`);
+    }
 });
 
 client.login(process.env.DISCORD_TOKEN); 
