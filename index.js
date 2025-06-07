@@ -57,20 +57,19 @@ async function checkCommitStatus() {
 }
 
 // Function to mute/unmute user
-async function updateUserMuteStatus(shouldMute) {
+async function updateUserMuteStatus(hasCommitted) {
     try {
         const guild = await client.guilds.fetch(SERVER_ID);
         const member = await guild.members.fetch(DISCORD_USER_ID);
         
-        if (shouldMute) {
-            console.log(`Attempting to mute ${member.user.tag}...`);
-            // Set timeout for 1 hour (in milliseconds)
-            await member.timeout(60 * 60 * 1000, 'No commit today');
-            console.log(`Muted ${member.user.tag} - No commit today`);
-        } else {
-            console.log(`Attempting to unmute ${member.user.tag}...`);
-            await member.timeout(0); // Remove timeout
+        if (hasCommitted) {
+            console.log(`Found commit, unmuting ${member.user.tag}...`);
+            await member.timeout(null); // Remove timeout
             console.log(`Unmuted ${member.user.tag} - Commit found`);
+        } else {
+            console.log(`No commit found, muting ${member.user.tag}...`);
+            await member.timeout(60 * 60 * 1000, 'No commit today'); // 1 hour timeout
+            console.log(`Muted ${member.user.tag} - No commit today`);
         }
     } catch (error) {
         console.error('Error updating mute status:', error);
@@ -85,13 +84,13 @@ client.once('ready', () => {
     setInterval(async () => {
         console.log('Running scheduled check...');
         const hasCommitted = await checkCommitStatus();
-        await updateUserMuteStatus(!hasCommitted);
+        await updateUserMuteStatus(hasCommitted);
     }, 30000); // 30 seconds for testing
     
     // Initial check
     console.log('Running initial check...');
     checkCommitStatus().then(hasCommitted => {
-        updateUserMuteStatus(!hasCommitted);
+        updateUserMuteStatus(hasCommitted);
     });
 });
 
@@ -102,8 +101,8 @@ client.on('messageCreate', async (message) => {
     if (message.content === '!check') {
         console.log('Manual check requested...');
         const hasCommitted = await checkCommitStatus();
-        await updateUserMuteStatus(!hasCommitted);
-        message.reply(`Commit status: ${hasCommitted ? 'Found commit' : 'No commit found'}`);
+        await updateUserMuteStatus(hasCommitted);
+        message.reply(hasCommitted ? 'You have committed today! ✅' : 'No commits found today. Get to work! ❌');
     }
 
     if (message.content === '!test') {
