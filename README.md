@@ -1,27 +1,13 @@
 # GitHub Lock-in Bot
 
-A Discord bot that keeps you accountable for daily GitHub commits by timing you out in Discord if you haven't committed today. The bot checks your GitHub activity every 5 minutes and:
+A Discord bot that keeps you accountable for daily GitHub commits by timing you out in Discord if you haven't committed today. The bot checks your GitHub activity every 30 seconds and:
 - Mutes you for 1 hour if you haven't committed today
 - Unmutes you as soon as you make a commit
 - Works with both public and private repositories
 By default it is set up to work only for it's original creator (hi that's me i'm dani), but you can clone it and substitute in your own GitHub and Discord info to make it work for you.
 
-## Repository Setup
-Before following the setup instructions, make sure to:
-1. Click the "Use this template" button at the top of this repository
-   - This creates a clean copy of the repository for you
-   - Choose "Create a new repository"
-   - Make it Public or Private (your choice)
-2. Clone your new repository to your local machine
-3. Create a `.env` file locally (it won't be committed to GitHub)
-
-This is better than forking because:
-- You get a clean commit history
-- You can make it private if you want
-- You won't get notifications from the original repo
-- Your GitHub tokens will be safe in your `.env` file
-
 ## Setup Instructions
+Please note, this is intended for use in small personal servers, as you need a mod to approve of adding the bot and raising its role above yours in order for this to work.
 
 ### 1. Create a Discord Bot
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
