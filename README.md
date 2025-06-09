@@ -1,10 +1,25 @@
 # GitHub Lock-in Bot
 
-A Discord bot that keeps you accountable for daily GitHub commits by timing you out in Discord if you haven't committed today. The bot checks your GitHub activity every 30 seconds and:
+A Discord bot that keeps you accountable for daily GitHub commits by timing you out in Discord if you haven't committed today. The bot checks your GitHub activity every 5 minutes and:
 - Mutes you for 1 hour if you haven't committed today
 - Unmutes you as soon as you make a commit
 - Works with both public and private repositories
 By default it is set up to work only for it's original creator (hi that's me i'm dani), but you can clone it and substitute in your own GitHub and Discord info to make it work for you.
+
+## Repository Setup
+Before following the setup instructions, make sure to:
+1. Click the "Use this template" button at the top of this repository
+   - This creates a clean copy of the repository for you
+   - Choose "Create a new repository"
+   - Make it Public or Private (your choice)
+2. Clone your new repository to your local machine
+3. Create a `.env` file locally (it won't be committed to GitHub)
+
+This is better than forking because:
+- You get a clean commit history
+- You can make it private if you want
+- You won't get notifications from the original repo
+- Your GitHub tokens will be safe in your `.env` file
 
 ## Setup Instructions
 
@@ -36,21 +51,28 @@ By default it is set up to work only for it's original creator (hi that's me i'm
 4. Note your GitHub username - This is your `GITHUB_USERNAME`
 
 ### 4. Deploy to Railway
-1. Fork this repository
+1. Use your repository created from the template
 2. Go to [Railway](https://railway.app/) (This is what I used, but you can opt to host wherever you wish)
 3. Create a new project
 4. Select "Deploy from GitHub repo"
 5. Choose your forked repository
-6. Add these environment variables:
+6. Add these environment variables in Railway:
    - `DISCORD_TOKEN` (your Discord bot token)
    - `GITHUB_TOKEN` (your GitHub personal access token)
-7. In `index.js`, update these constants with your information:
-   ```javascript
-   const GITHUB_USERNAME = 'your-github-username';
-   const DISCORD_USER_ID = 'your-discord-user-id';
-   const SERVER_ID = 'your-server-id';
-   ```
-8. Commit and push your changes
+   - `GITHUB_USERNAME` (your GitHub username)
+   - `DISCORD_USER_ID` (your Discord user ID)
+   - `SERVER_ID` (your server ID)
+
+For local development:
+1. Create a `.env` file in your repository with the same variables:
+```env
+DISCORD_TOKEN=your-discord-token
+GITHUB_TOKEN=your-github-token
+GITHUB_USERNAME=your-github-username
+DISCORD_USER_ID=your-discord-user-id
+SERVER_ID=your-server-id
+```
+Note: The `.env` file is in `.gitignore` and won't be committed to GitHub.
 
 ### 5. Add Bot to Your Server
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)

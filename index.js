@@ -81,12 +81,12 @@ async function updateUserMuteStatus(hasCommitted) {
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
     
-    // Check commit status every 30 seconds for testing
+    // Check commit status every 5 minutes
     setInterval(async () => {
         console.log('Running scheduled check...');
         const hasCommitted = await checkCommitStatus();
         await updateUserMuteStatus(hasCommitted);
-    }, 30000); // 30 seconds for testing
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
     
     // Initial check
     console.log('Running initial check...');
