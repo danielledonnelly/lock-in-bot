@@ -44,7 +44,7 @@ By default it is set up to work only for it's original creator (hi that's me i'm
 6. Add these environment variables:
    - `DISCORD_TOKEN` (your Discord bot token)
    - `GITHUB_TOKEN` (your GitHub personal access token)
-7. In `index.js`, update these constants:
+7. In `index.js`, update these constants with your information:
    ```javascript
    const GITHUB_USERNAME = 'your-github-username';
    const DISCORD_USER_ID = 'your-discord-user-id';

@@ -11,10 +11,10 @@ const client = new Client({
     ] 
 });
 
-// Replace these with your own values
-const GITHUB_USERNAME = 'danielledonnelly';
-const DISCORD_USER_ID = '480415224164253707';
-const SERVER_ID = '497544520695808000';
+// These values should be set in your .env file
+const GITHUB_USERNAME = process.env.GITHUB_USERNAME || 'your-github-username';
+const DISCORD_USER_ID = process.env.DISCORD_USER_ID || 'your-discord-user-id';
+const SERVER_ID = process.env.SERVER_ID || 'your-server-id';
 
 // Function to check if user has committed today
 async function checkCommitStatus() {
