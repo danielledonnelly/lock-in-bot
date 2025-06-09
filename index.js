@@ -11,6 +11,7 @@ const client = new Client({
     ] 
 });
 
+// Replace these with your own values
 const GITHUB_USERNAME = 'danielledonnelly';
 const DISCORD_USER_ID = '480415224164253707';
 const SERVER_ID = '497544520695808000';
