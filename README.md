@@ -1,7 +1,7 @@
 # GitHub Lock-in Bot
 
-A Discord bot that keeps you accountable for daily GitHub commits by timing you out in Discord if you haven't committed today. The bot checks your GitHub activity every 30 seconds and:
-- Mutes you for 1 hour if you haven't committed today
+A Discord bot that keeps you accountable for daily GitHub commits by timing you out in Discord if you haven't committed today. The bot checks your GitHub activity every 5 minutes and:
+- Mutes you from a specific server for 1 hour if you haven't committed today
 - Unmutes you as soon as you make a commit
 - Works with both public and private repositories
 By default it is set up to work only for it's original creator (hi that's me i'm dani), but you can clone it and substitute in your own GitHub and Discord info to make it work for you.
