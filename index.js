@@ -11,6 +11,19 @@ const client = new Client({
     ] 
 });
 
+// Get today's date range in Newfoundland Time (UTC-3:30)
+function getNewfoundlandDateRange() {
+    const now = new Date();
+    // Get start of today in NT (midnight NT)
+    const startOfToday = new Date();
+    startOfToday.setHours(3, 30, 0, 0); // Midnight in NT is 3:30 UTC
+    
+    return {
+        start: startOfToday.toISOString().split('.')[0]+'Z',
+        end: now.toISOString().split('.')[0]+'Z'
+    };
+}
+
 // These values should be set in your .env file
 const GITHUB_USERNAME = process.env.GITHUB_USERNAME || 'your-github-username';
 const DISCORD_USER_ID = process.env.DISCORD_USER_ID || 'your-discord-user-id';
@@ -18,11 +31,15 @@ const SERVER_ID = process.env.SERVER_ID || 'your-server-id';
 
 // Function to check if user has committed today
 async function checkCommitStatus() {
-    const today = new Date().toISOString().split('T')[0];
-    console.log(`Checking commits for ${today}...`);
+    const dateRange = getNewfoundlandDateRange();
+    console.log('Checking commits between:');
+    console.log('Start (midnight NT):', dateRange.start);
+    console.log('End (now):', dateRange.end);
+    
     try {
-        // Search for commits by the user from today
-        const query = `author:${GITHUB_USERNAME} committer-date:${today}`;
+        // Search for commits by the user from today in NT
+        const query = `author:${GITHUB_USERNAME} committer-date:>${dateRange.start}`;
+        console.log('GitHub search query:', query);
         const response = await fetch(`https://api.github.com/search/commits?q=${encodeURIComponent(query)}`, {
             headers: {
                 'Authorization': `token ${process.env.GITHUB_TOKEN}`,
