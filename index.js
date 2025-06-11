@@ -111,11 +111,13 @@ async function updateUserMuteStatus(hasCommitted) {
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
     
-    // Check commit status every 5 minutes
+    // Check commit status every 5 minutes if not in focus mode
     setInterval(async () => {
-        console.log('Running scheduled check...');
-        const hasCommitted = await checkCommitStatus();
-        await updateUserMuteStatus(hasCommitted);
+        if (checkMode !== 'focus') {
+            console.log('Running scheduled check...');
+            const hasCommitted = await checkCommitStatus();
+            await updateUserMuteStatus(hasCommitted);
+        }
     }, 5 * 60 * 1000); // 5 minutes in milliseconds
     
     // Initial check
