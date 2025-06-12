@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, PermissionsBitField, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, PermissionsBitField, REST, Routes, SlashCommandBuilder, Partials } = require('discord.js');
 const fetch = require('node-fetch');
 
 const client = new Client({ 
@@ -7,8 +7,16 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ] 
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildPresences
+    ],
+    partials: [
+        Partials.Channel,
+        Partials.Message,
+        Partials.User,
+        Partials.GuildMember
+    ]
 });
 
 // Bot configuration
@@ -52,18 +60,55 @@ const commands = [
 // Register slash commands
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
-(async () => {
+// Move command registration to after client is ready
+client.once('ready', async () => {
+    console.log(`Logged in as ${client.user.tag}!`);
+    console.log('Bot is ready to handle commands!');
+    
     try {
         console.log('Started refreshing application (/) commands.');
-        await rest.put(
+        
+        if (!process.env.CLIENT_ID) {
+            throw new Error('CLIENT_ID is not set in .env file');
+        }
+        
+        if (!SERVER_ID) {
+            throw new Error('SERVER_ID is not set in .env file');
+        }
+
+        console.log('Registering commands for guild:', SERVER_ID);
+        console.log('Using client ID:', process.env.CLIENT_ID);
+        
+        const data = await rest.put(
             Routes.applicationGuildCommands(process.env.CLIENT_ID, SERVER_ID),
             { body: commands },
         );
-        console.log('Successfully reloaded application (/) commands.');
+        
+        console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+        console.log('Registered commands:', data.map(cmd => cmd.name).join(', '));
     } catch (error) {
-        console.error(error);
+        console.error('Error registering commands:', error);
+        console.error('Full error details:', {
+            message: error.message,
+            stack: error.stack,
+            response: error.response?.data
+        });
     }
-})();
+    
+    // Check commit status every 5 minutes
+    setInterval(async () => {
+        console.log(`Current mode: ${checkMode}`);
+        console.log('Running scheduled check...');
+        const hasCommitted = await checkCommitStatus();
+        await updateUserMuteStatus(hasCommitted);
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+    
+    // Initial check
+    console.log('Running initial check...');
+    checkCommitStatus().then(hasCommitted => {
+        updateUserMuteStatus(hasCommitted);
+    });
+});
 
 // Get date range based on check mode
 function getDateRange() {
@@ -151,18 +196,18 @@ async function handleSelfMute(interaction, hours) {
         const member = await guild.members.fetch(DISCORD_USER_ID);
         
         if (interaction.user.id !== DISCORD_USER_ID) {
-            await interaction.reply('You can only mute yourself, not others!');
+            await interaction.editReply('You can only mute yourself, not others!');
             return;
         }
 
         const milliseconds = hours * 60 * 60 * 1000;
         selfMuteEndTime = Date.now() + milliseconds;
         await member.timeout(milliseconds, `Self-muted for ${hours} hour(s)`);
-        await interaction.reply(`You have been muted for ${hours} hour(s). Use this time to focus and get work done!`);
+        await interaction.editReply(`You have been muted for ${hours} hour(s). Use this time to focus and get work done!`);
         console.log(`Self-muted ${member.user.tag} for ${hours} hour(s)`);
     } catch (error) {
         console.error('Error setting self-mute timeout:', error);
-        await interaction.reply('Failed to set mute. Please check bot permissions.');
+        await interaction.editReply('Failed to set mute. Please check bot permissions.');
     }
 }
 
@@ -190,24 +235,6 @@ async function updateUserMuteStatus(hasCommitted) {
     }
 }
 
-client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-    
-    // Check commit status every 5 minutes
-    setInterval(async () => {
-        console.log(`Current mode: ${checkMode}`);
-        console.log('Running scheduled check...');
-        const hasCommitted = await checkCommitStatus();
-        await updateUserMuteStatus(hasCommitted);
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
-    
-    // Initial check
-    console.log('Running initial check...');
-    checkCommitStatus().then(hasCommitted => {
-        updateUserMuteStatus(hasCommitted);
-    });
-});
-
 // When changing modes, handle the transition
 async function handleModeChange(newMode, interaction) {
     const oldMode = checkMode;
@@ -221,28 +248,43 @@ async function handleModeChange(newMode, interaction) {
     }
     
     if (newMode === 'daily') {
-        await interaction.reply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
+        await interaction.editReply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
     } else if (newMode === '8hour') {
-        await interaction.reply('Switched to 8-hour window mode. You need one commit every 8 hours to avoid being muted.');
+        await interaction.editReply('Switched to 8-hour window mode. You need one commit every 8 hours to avoid being muted.');
     }
 }
 
-// Remove the old messageCreate event handler and replace with interactionCreate
+// Update interactionCreate handler with better error handling
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isCommand()) return;
+    console.log('Received interaction:', interaction.type);
+    
+    if (!interaction.isCommand()) {
+        console.log('Interaction is not a command, ignoring');
+        return;
+    }
 
     const { commandName } = interaction;
+    console.log(`Received command: ${commandName} from user: ${interaction.user.tag}`);
 
     // Only allow the target user to use commands
     if (interaction.user.id !== DISCORD_USER_ID) {
-        await interaction.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
+        console.log(`Command rejected: User ${interaction.user.tag} is not authorized`);
+        await interaction.reply({ 
+            content: 'You can only lock yourself in, but you can\'t lock anyone else in!',
+            ephemeral: true 
+        });
         return;
     }
 
     try {
+        // Defer reply to prevent timeout
+        await interaction.deferReply();
+        console.log('Deferred reply for command:', commandName);
+
         switch (commandName) {
             case 'mode':
                 const modeType = interaction.options.getString('type');
+                console.log(`Mode command received with type: ${modeType}`);
                 if (modeType) {
                     await handleModeChange(modeType, interaction);
                 } else {
@@ -252,32 +294,52 @@ client.on('interactionCreate', async interaction => {
                     } else {
                         currentMode = '8-hour window mode (one commit every 8 hours)';
                     }
-                    await interaction.reply(`Currently in ${currentMode}`);
+                    await interaction.editReply(`Currently in ${currentMode}`);
                 }
                 break;
 
             case 'check':
                 console.log('Manual check requested...');
                 const hasCommitted = await checkCommitStatus();
+                console.log('Commit check result:', hasCommitted);
                 const timeWindow = checkMode === 'daily' ? 'today' : 'in the last 8 hours';
                 await updateUserMuteStatus(hasCommitted);
-                await interaction.reply(hasCommitted 
+                const replyMessage = hasCommitted 
                     ? `Congratulations, you have locked in! You have committed ${timeWindow}!` 
-                    : `No commits found ${timeWindow}. Lock in now or you will be silenced.`);
+                    : `No commits found ${timeWindow}. Lock in now or you will be silenced.`;
+                console.log('Sending reply:', replyMessage);
+                await interaction.editReply(replyMessage);
                 break;
 
             case 'mute':
                 const hours = parseInt(interaction.options.getString('duration'));
+                console.log(`Mute command received for ${hours} hours`);
                 await handleSelfMute(interaction, hours);
                 break;
 
             case 'test':
-                await interaction.reply('Bot is working! Probably!');
+                console.log('Test command received');
+                await interaction.editReply('Bot is working! Probably!');
                 break;
         }
     } catch (error) {
         console.error('Error handling command:', error);
-        await interaction.reply('There was an error executing that command.');
+        console.error('Full error details:', {
+            message: error.message,
+            stack: error.stack
+        });
+        
+        try {
+            const errorMessage = interaction.deferred 
+                ? await interaction.editReply('There was an error executing that command.')
+                : await interaction.reply({ 
+                    content: 'There was an error executing that command.',
+                    ephemeral: true 
+                });
+            console.log('Error message sent to user');
+        } catch (replyError) {
+            console.error('Failed to send error message to user:', replyError);
+        }
     }
 });
 
