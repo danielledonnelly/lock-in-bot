@@ -113,19 +113,56 @@ client.once('ready', () => {
     
     // Check commit status every 5 minutes if not in focus mode
     setInterval(async () => {
+        console.log(`Current mode: ${checkMode}`);
         if (checkMode !== 'focus') {
             console.log('Running scheduled check...');
             const hasCommitted = await checkCommitStatus();
             await updateUserMuteStatus(hasCommitted);
+        } else {
+            console.log('Skipping scheduled check - in focus mode');
         }
     }, 5 * 60 * 1000); // 5 minutes in milliseconds
     
-    // Initial check
+    // Initial check if not starting in focus mode
     console.log('Running initial check...');
-    checkCommitStatus().then(hasCommitted => {
-        updateUserMuteStatus(hasCommitted);
-    });
+    if (checkMode !== 'focus') {
+        checkCommitStatus().then(hasCommitted => {
+            updateUserMuteStatus(hasCommitted);
+        });
+    }
 });
+
+// When changing modes, handle the transition
+async function handleModeChange(newMode, message) {
+    const oldMode = checkMode;
+    checkMode = newMode;
+    
+    if (newMode === 'focus') {
+        message.reply('Focus mode activated! You will be muted for one hour. Use this time to lock in and get work done!');
+        try {
+            const guild = await client.guilds.fetch(SERVER_ID);
+            const member = await guild.members.fetch(DISCORD_USER_ID);
+            await member.timeout(60 * 60 * 1000, 'Focus mode activated');
+            console.log(`Muted ${member.user.tag} for focus mode`);
+        } catch (error) {
+            console.error('Error setting focus mode timeout:', error);
+            message.reply('Failed to activate focus mode. Please check bot permissions.');
+        }
+    } else {
+        // If coming out of focus mode or switching between check modes, do an immediate check
+        if (oldMode === 'focus' || (oldMode !== newMode)) {
+            console.log('Mode changed, running immediate check...');
+            const hasCommitted = await checkCommitStatus();
+            await updateUserMuteStatus(hasCommitted);
+        }
+        
+        if (newMode === 'daily') {
+            message.reply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
+        } else if (newMode === '8hour') {
+            message.reply('Switched to 8-hour window mode. You need one commit every 8 hours to avoid being muted.');
+        }
+    }
+}
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
@@ -139,24 +176,11 @@ client.on('messageCreate', async (message) => {
         }
         
         if (message.content === '!mode daily') {
-            checkMode = 'daily';
-            message.reply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
+            await handleModeChange('daily', message);
         } else if (message.content === '!mode 8hour') {
-            checkMode = '8hour';
-            message.reply('Switched to 8-hour window mode. You need one commit every 8 hours to avoid being muted.');
+            await handleModeChange('8hour', message);
         } else if (message.content === '!mode focushour') {
-            checkMode = 'focus';
-            message.reply('Focus mode activated! You will be muted for one hour. Use this time to lock in and get work done!');
-            // Get the guild and member
-            try {
-                const guild = await client.guilds.fetch(SERVER_ID);
-                const member = await guild.members.fetch(DISCORD_USER_ID);
-                await member.timeout(60 * 60 * 1000, 'Focus mode activated');
-                console.log(`Muted ${member.user.tag} for focus mode`);
-            } catch (error) {
-                console.error('Error setting focus mode timeout:', error);
-                message.reply('Failed to activate focus mode. Please check bot permissions.');
-            }
+            await handleModeChange('focus', message);
         } else if (message.content === '!mode') {
             let currentMode;
             if (checkMode === 'daily') {
