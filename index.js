@@ -12,7 +12,7 @@ const client = new Client({
 });
 
 // Bot configuration
-let checkMode = 'daily'; // can be 'daily', '8hour', or 'focus'
+let checkMode = 'daily'; // can be 'daily' or '8hour'
 
 // Get date range based on check mode
 function getDateRange() {
@@ -87,24 +87,18 @@ async function checkCommitStatus() {
     }
 }
 
-// Function to mute/unmute user
-async function updateUserMuteStatus(hasCommitted) {
+// Function to mute user for specified duration
+async function muteUser(durationHours, message) {
     try {
         const guild = await client.guilds.fetch(SERVER_ID);
         const member = await guild.members.fetch(DISCORD_USER_ID);
-        
-        if (hasCommitted) {
-            console.log(`Found commit, unmuting ${member.user.tag}...`);
-            await member.timeout(null); // Remove timeout
-            console.log(`Unmuted ${member.user.tag} - Commit found`);
-        } else {
-            console.log(`No commit found, muting ${member.user.tag}...`);
-            await member.timeout(60 * 60 * 1000, 'No commit today'); // 1 hour timeout
-            console.log(`Muted ${member.user.tag} - No commit today`);
-        }
+        const durationMs = durationHours * 60 * 60 * 1000;
+        await member.timeout(durationMs, `Manual mute for ${durationHours} hour${durationHours > 1 ? 's' : ''}`);
+        console.log(`Muted ${member.user.tag} for ${durationHours} hour${durationHours > 1 ? 's' : ''}`);
+        message.reply(`You have been muted for ${durationHours} hour${durationHours > 1 ? 's' : ''}. Use this time to lock in and get work done!`);
     } catch (error) {
-        console.error('Error updating mute status:', error);
-        console.error('Full error:', error);
+        console.error('Error setting mute:', error);
+        message.reply('Failed to mute. Please check bot permissions.');
     }
 }
 
@@ -167,6 +161,20 @@ async function handleModeChange(newMode, message) {
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
     
+    // Handle mute duration commands
+    if (message.content.startsWith('!mute')) {
+        if (message.author.id !== DISCORD_USER_ID) {
+            message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
+            return;
+        }
+
+        const duration = message.content.match(/!mute(\d+)hour/)?.[1];
+        if (duration && ['1', '2', '4', '8'].includes(duration)) {
+            await muteUser(parseInt(duration), message);
+        }
+        return;
+    }
+    
     // If you want other people to be able to do bot commands, edit the code below
     // Only allow the target user to use mode commands
     if (message.content.startsWith('!mode')) {
@@ -176,20 +184,13 @@ client.on('messageCreate', async (message) => {
         }
         
         if (message.content === '!mode daily') {
-            await handleModeChange('daily', message);
+            checkMode = 'daily';
+            message.reply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
         } else if (message.content === '!mode 8hour') {
-            await handleModeChange('8hour', message);
-        } else if (message.content === '!mode focushour') {
-            await handleModeChange('focus', message);
+            checkMode = '8hour';
+            message.reply('Switched to 8-hour window mode. You need one commit every 8 hours to avoid being muted.');
         } else if (message.content === '!mode') {
-            let currentMode;
-            if (checkMode === 'daily') {
-                currentMode = 'daily commit mode (one commit per day NT)';
-            } else if (checkMode === '8hour') {
-                currentMode = '8-hour window mode (one commit every 8 hours)';
-            } else {
-                currentMode = 'focus mode (1-hour mute for concentrated work)';
-            }
+            const currentMode = checkMode === 'daily' ? 'daily commit mode (one commit per day NT)' : '8-hour window mode (one commit every 8 hours)';
             message.reply(`Currently in ${currentMode}`);
         }
         return;
