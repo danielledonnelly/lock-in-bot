@@ -87,18 +87,24 @@ async function checkCommitStatus() {
     }
 }
 
-// Function to mute user for specified duration
-async function muteUser(durationHours, message) {
+// Function to mute/unmute user
+async function updateUserMuteStatus(hasCommitted) {
     try {
         const guild = await client.guilds.fetch(SERVER_ID);
         const member = await guild.members.fetch(DISCORD_USER_ID);
-        const durationMs = durationHours * 60 * 60 * 1000;
-        await member.timeout(durationMs, `Manual mute for ${durationHours} hour${durationHours > 1 ? 's' : ''}`);
-        console.log(`Muted ${member.user.tag} for ${durationHours} hour${durationHours > 1 ? 's' : ''}`);
-        message.reply(`You have been muted for ${durationHours} hour${durationHours > 1 ? 's' : ''}. Use this time to lock in and get work done!`);
+        
+        if (hasCommitted) {
+            console.log(`Found commit, unmuting ${member.user.tag}...`);
+            await member.timeout(null); // Remove timeout
+            console.log(`Unmuted ${member.user.tag} - Commit found`);
+        } else {
+            console.log(`No commit found, muting ${member.user.tag}...`);
+            await member.timeout(60 * 60 * 1000, 'No commit today'); // 1 hour timeout
+            console.log(`Muted ${member.user.tag} - No commit today`);
+        }
     } catch (error) {
-        console.error('Error setting mute:', error);
-        message.reply('Failed to mute. Please check bot permissions.');
+        console.error('Error updating mute status:', error);
+        console.error('Full error:', error);
     }
 }
 
@@ -126,68 +132,61 @@ client.once('ready', () => {
     }
 });
 
+// Function to handle self-muting
+async function handleSelfMute(message, hours) {
+    try {
+        const guild = await client.guilds.fetch(SERVER_ID);
+        const member = await guild.members.fetch(DISCORD_USER_ID);
+        
+        if (message.author.id !== DISCORD_USER_ID) {
+            message.reply('You can only mute yourself, not others!');
+            return;
+        }
+
+        const milliseconds = hours * 60 * 60 * 1000;
+        await member.timeout(milliseconds, `Self-muted for ${hours} hour(s)`);
+        message.reply(`You have been muted for ${hours} hour(s). Use this time to focus and get work done!`);
+        console.log(`Self-muted ${member.user.tag} for ${hours} hour(s)`);
+    } catch (error) {
+        console.error('Error setting self-mute timeout:', error);
+        message.reply('Failed to set mute. Please check bot permissions.');
+    }
+}
+
 // When changing modes, handle the transition
 async function handleModeChange(newMode, message) {
     const oldMode = checkMode;
     checkMode = newMode;
     
-    if (newMode === 'focus') {
-        message.reply('Focus mode activated! You will be muted for one hour. Use this time to lock in and get work done!');
-        try {
-            const guild = await client.guilds.fetch(SERVER_ID);
-            const member = await guild.members.fetch(DISCORD_USER_ID);
-            await member.timeout(60 * 60 * 1000, 'Focus mode activated');
-            console.log(`Muted ${member.user.tag} for focus mode`);
-        } catch (error) {
-            console.error('Error setting focus mode timeout:', error);
-            message.reply('Failed to activate focus mode. Please check bot permissions.');
-        }
-    } else {
-        // If coming out of focus mode or switching between check modes, do an immediate check
-        if (oldMode === 'focus' || (oldMode !== newMode)) {
-            console.log('Mode changed, running immediate check...');
-            const hasCommitted = await checkCommitStatus();
-            await updateUserMuteStatus(hasCommitted);
-        }
-        
-        if (newMode === 'daily') {
-            message.reply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
-        } else if (newMode === '8hour') {
-            message.reply('Switched to 8-hour window mode. You need one commit every 8 hours to avoid being muted.');
-        }
+    // If switching between check modes, do an immediate check
+    if (oldMode !== newMode) {
+        console.log('Mode changed, running immediate check...');
+        const hasCommitted = await checkCommitStatus();
+        await updateUserMuteStatus(hasCommitted);
+    }
+    
+    if (newMode === 'daily') {
+        message.reply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
+    } else if (newMode === '8hour') {
+        message.reply('Switched to 8-hour window mode. You need one commit every 8 hours to avoid being muted.');
     }
 }
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
     
-    // Handle mute duration commands
-    if (message.content.startsWith('!mute')) {
-        console.log('Mute command received:', message.content);
-        console.log('Author ID:', message.author.id);
-        console.log('Expected DISCORD_USER_ID:', DISCORD_USER_ID);
-        
-        if (message.author.id !== DISCORD_USER_ID) {
-            console.log('Command rejected: User ID mismatch');
-            message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
-            return;
-        }
-
-        const duration = message.content.match(/!mute(\d+)hour/)?.[1];
-        console.log('Extracted duration:', duration);
-        
-        if (duration && ['1', '2', '4', '8'].includes(duration)) {
-            console.log('Valid duration found, attempting to mute for', duration, 'hours');
-            await muteUser(parseInt(duration), message);
-        } else {
-            console.log('Invalid duration or format');
-            message.reply('Invalid mute duration. Use !mute1hour, !mute2hour, !mute4hour, or !mute8hour');
-        }
-        return;
+    // Handle self-mute commands
+    if (message.content === '!mute1hour') {
+        await handleSelfMute(message, 1);
+    } else if (message.content === '!mute2hour') {
+        await handleSelfMute(message, 2);
+    } else if (message.content === '!mute4hour') {
+        await handleSelfMute(message, 4);
+    } else if (message.content === '!mute8hour') {
+        await handleSelfMute(message, 8);
     }
     
-    // If you want other people to be able to do bot commands, edit the code below
-    // Only allow the target user to use mode commands
+    // Handle mode commands
     if (message.content.startsWith('!mode')) {
         if (message.author.id !== DISCORD_USER_ID) {
             message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
@@ -195,20 +194,22 @@ client.on('messageCreate', async (message) => {
         }
         
         if (message.content === '!mode daily') {
-            checkMode = 'daily';
-            message.reply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
+            await handleModeChange('daily', message);
         } else if (message.content === '!mode 8hour') {
-            checkMode = '8hour';
-            message.reply('Switched to 8-hour window mode. You need one commit every 8 hours to avoid being muted.');
+            await handleModeChange('8hour', message);
         } else if (message.content === '!mode') {
-            const currentMode = checkMode === 'daily' ? 'daily commit mode (one commit per day NT)' : '8-hour window mode (one commit every 8 hours)';
+            let currentMode;
+            if (checkMode === 'daily') {
+                currentMode = 'daily commit mode (one commit per day NT)';
+            } else {
+                currentMode = '8-hour window mode (one commit every 8 hours)';
+            }
             message.reply(`Currently in ${currentMode}`);
         }
         return;
     }
 
-    // If you want other people to be able to do bot commands, edit the code below
-    // Only allow the target user to check their commits
+    // Handle check command
     if (message.content === '!check') {
         if (message.author.id !== DISCORD_USER_ID) {
             message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
