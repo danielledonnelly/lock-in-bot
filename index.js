@@ -163,14 +163,25 @@ client.on('messageCreate', async (message) => {
     
     // Handle mute duration commands
     if (message.content.startsWith('!mute')) {
+        console.log('Mute command received:', message.content);
+        console.log('Author ID:', message.author.id);
+        console.log('Expected DISCORD_USER_ID:', DISCORD_USER_ID);
+        
         if (message.author.id !== DISCORD_USER_ID) {
+            console.log('Command rejected: User ID mismatch');
             message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
             return;
         }
 
         const duration = message.content.match(/!mute(\d+)hour/)?.[1];
+        console.log('Extracted duration:', duration);
+        
         if (duration && ['1', '2', '4', '8'].includes(duration)) {
+            console.log('Valid duration found, attempting to mute for', duration, 'hours');
             await muteUser(parseInt(duration), message);
+        } else {
+            console.log('Invalid duration or format');
+            message.reply('Invalid mute duration. Use !mute1hour, !mute2hour, !mute4hour, or !mute8hour');
         }
         return;
     }
