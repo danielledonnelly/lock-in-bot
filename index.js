@@ -21,10 +21,20 @@ function getDateRange() {
     
     if (checkMode === 'daily') {
         // Get start of today in NT (midnight NT)
-        const startOfToday = new Date();
-        startOfToday.setHours(3, 30, 0, 0); // Midnight in NT is 3:30 UTC
+        // NT is UTC-3:30, so midnight NT is 3:30 AM UTC
+        const nowUTC = new Date();
+        const ntOffset = -3.5 * 60; // NT is UTC-3:30 (in minutes)
+        const nowNT = new Date(nowUTC.getTime() + (ntOffset * 60 * 1000));
+        
+        // Get midnight NT in NT timezone
+        const midnightNT = new Date(nowNT);
+        midnightNT.setHours(0, 0, 0, 0);
+        
+        // Convert midnight NT back to UTC
+        const midnightUTC = new Date(midnightNT.getTime() - (ntOffset * 60 * 1000));
+        
         return {
-            start: startOfToday.toISOString().split('.')[0]+'Z',
+            start: midnightUTC.toISOString().split('.')[0]+'Z',
             end: now.toISOString().split('.')[0]+'Z'
         };
     } else {
@@ -229,6 +239,26 @@ client.on('messageCreate', async (message) => {
 
     if (message.content === '!test') {
         message.reply('Bot is working! Probably!');
+    }
+
+    // Handle unmute command for immediate relief
+    if (message.content === '!unmute') {
+        if (message.author.id !== DISCORD_USER_ID) {
+            message.reply('You can only unmute yourself!');
+            return;
+        }
+        
+        try {
+            const guild = await client.guilds.fetch(SERVER_ID);
+            const member = await guild.members.fetch(DISCORD_USER_ID);
+            await member.timeout(null); // Remove timeout
+            selfMuteEndTime = null; // Clear self-mute tracking
+            message.reply('You have been unmuted! Now go commit some code!');
+            console.log(`Manually unmuted ${member.user.tag}`);
+        } catch (error) {
+            console.error('Error unmuting:', error);
+            message.reply('Failed to unmute. Please check bot permissions.');
+        }
     }
 });
 
