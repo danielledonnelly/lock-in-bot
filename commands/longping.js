@@ -1,16 +1,23 @@
 // Use this for all other commands.
 
-const { SlashCommandBuilder } = require('discord.js');
+import { SlashCommandBuilder } from 'discord.js';
 
-const wait = require('node:timers/promises').setTimeout;
+import { setTimeout as wait } from 'node:timers/promises';
 
-module.exports = {
+export default {
+
     data: new SlashCommandBuilder()
         .setName('pinglong')
-        .setDescription('Replies with Pong!'),
-    async execute(interaction) {
+        .setDescription('Replies with pong after a delay!')
+        .addIntegerOption(option => option.setName('seconds')
+            .setDescription('How long in seconds to wait')
+            .setRequired(true)
+        ),
+
+    execute: async (interaction) => {
+        const seconds = interaction.options.getInteger('seconds') 
         await interaction.deferReply();
-        await wait(4000);
+        await wait(seconds * 1000);
         await interaction.editReply('Pong!');
-    },
-};
+    }
+}

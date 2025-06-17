@@ -1,12 +1,11 @@
 // Use this for a fast running command. A fast running command is a command that finishes within 3 seconds
+import { SlashCommandBuilder } from 'discord.js';
 
-const { SlashCommandBuilder } = require('discord.js');
-
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('ping')
         .setDescription('Replies with Pong!'),
-    async execute(interaction) {
+    execute: async (interaction) => {
         await interaction.reply('Pong!');
-    },
-};
+    }
+}
