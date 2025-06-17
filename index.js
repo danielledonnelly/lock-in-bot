@@ -1,13 +1,14 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Events, PermissionsBitField } = require('discord.js');
 const fetch = require('node-fetch');
+const path = require('path');
+const fs = require('fs');
 
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        // GatewayIntentBits.GuildMessages,
     ] 
 });
 
@@ -72,7 +73,7 @@ async function checkCommitStatus() {
         console.log('GitHub search query:', query);
         const response = await fetch(`https://api.github.com/search/commits?q=${encodeURIComponent(query)}`, {
             headers: {
-                'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+                // 'Authorization': `token ${process.env.GITHUB_TOKEN}`,
                 'Accept': 'application/vnd.github.cloak-preview+json'
             }
         });
@@ -150,6 +151,43 @@ async function updateUserMuteStatus(hasCommitted) {
     }
 }
 
+client.commands = new Collection();
+
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+    // Set a new item in the Collection with the key as the command name and the value as the exported module
+    if ('data' in command && 'execute' in command) {
+        client.commands.set(command.data.name, command);
+    } else {
+        console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+    }
+}
+
+client.on(Events.InteractionCreate, async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+
+	const command = interaction.client.commands.get(interaction.commandName);
+
+	if (!command) {
+		console.error(`No command matching ${interaction.commandName} was found.`);
+		return;
+	}
+
+	try {
+		await command.execute(interaction);
+	} catch (error) {
+		console.error(error);
+		if (interaction.replied || interaction.deferred) {
+			await interaction.followUp({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+		} else {
+			await interaction.reply({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+		}
+	}
+});
+
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
     
@@ -187,79 +225,80 @@ async function handleModeChange(newMode, message) {
     }
 }
 
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
+
+// client.on('messageCreate', async (message) => {
+//     if (message.author.bot) return;
     
-    // Handle self-mute commands
-    if (message.content === '!mute1hour') {
-        await handleSelfMute(message, 1);
-    } else if (message.content === '!mute2hour') {
-        await handleSelfMute(message, 2);
-    } else if (message.content === '!mute4hour') {
-        await handleSelfMute(message, 4);
-    } else if (message.content === '!mute8hour') {
-        await handleSelfMute(message, 8);
-    }
+//     // Handle self-mute commands
+//     if (message.content === '!mute1hour') {
+//         await handleSelfMute(message, 1);
+//     } else if (message.content === '!mute2hour') {
+//         await handleSelfMute(message, 2);
+//     } else if (message.content === '!mute4hour') {
+//         await handleSelfMute(message, 4);
+//     } else if (message.content === '!mute8hour') {
+//         await handleSelfMute(message, 8);
+//     }
     
-    // Handle mode commands
-    if (message.content.startsWith('!mode')) {
-        if (message.author.id !== DISCORD_USER_ID) {
-            message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
-            return;
-        }
+//     // Handle mode commands
+//     if (message.content.startsWith('!mode')) {
+//         if (message.author.id !== DISCORD_USER_ID) {
+//             message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
+//             return;
+//         }
         
-        if (message.content === '!mode daily') {
-            await handleModeChange('daily', message);
-        } else if (message.content === '!mode 8hour') {
-            await handleModeChange('8hour', message);
-        } else if (message.content === '!mode') {
-            let currentMode;
-            if (checkMode === 'daily') {
-                currentMode = 'daily commit mode (one commit per day NT)';
-            } else {
-                currentMode = '8-hour window mode (one commit every 8 hours)';
-            }
-            message.reply(`Currently in ${currentMode}`);
-        }
-        return;
-    }
+//         if (message.content === '!mode daily') {
+//             await handleModeChange('daily', message);
+//         } else if (message.content === '!mode 8hour') {
+//             await handleModeChange('8hour', message);
+//         } else if (message.content === '!mode') {
+//             let currentMode;
+//             if (checkMode === 'daily') {
+//                 currentMode = 'daily commit mode (one commit per day NT)';
+//             } else {
+//                 currentMode = '8-hour window mode (one commit every 8 hours)';
+//             }
+//             message.reply(`Currently in ${currentMode}`);
+//         }
+//         return;
+//     }
 
-    // Handle check command
-    if (message.content === '!check') {
-        if (message.author.id !== DISCORD_USER_ID) {
-            message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
-            return;
-        }
-        console.log('Manual check requested...');
-        const hasCommitted = await checkCommitStatus();
-        const timeWindow = checkMode === 'daily' ? 'today' : 'in the last 8 hours';
-        await updateUserMuteStatus(hasCommitted);
-        message.reply(hasCommitted ? `Congratulations, you have locked in! You have committed ${timeWindow}!` : `No commits found ${timeWindow}. Lock in now or you will be silenced.`);
-    }
+//     // Handle check command
+//     if (message.content === '!check') {
+//         if (message.author.id !== DISCORD_USER_ID) {
+//             message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
+//             return;
+//         }
+//         console.log('Manual check requested...');
+//         const hasCommitted = await checkCommitStatus();
+//         const timeWindow = checkMode === 'daily' ? 'today' : 'in the last 8 hours';
+//         await updateUserMuteStatus(hasCommitted);
+//         message.reply(hasCommitted ? `Congratulations, you have locked in! You have committed ${timeWindow}!` : `No commits found ${timeWindow}. Lock in now or you will be silenced.`);
+//     }
 
-    if (message.content === '!test') {
-        message.reply('Bot is working! Probably!');
-    }
+//     if (message.content === '!test') {
+//         message.reply('Bot is working! Probably!');
+//     }
 
-    // Handle unmute command for immediate relief
-    if (message.content === '!unmute') {
-        if (message.author.id !== DISCORD_USER_ID) {
-            message.reply('You can only unmute yourself!');
-            return;
-        }
+//     // Handle unmute command for immediate relief
+//     if (message.content === '!unmute') {
+//         if (message.author.id !== DISCORD_USER_ID) {
+//             message.reply('You can only unmute yourself!');
+//             return;
+//         }
         
-        try {
-            const guild = await client.guilds.fetch(SERVER_ID);
-            const member = await guild.members.fetch(DISCORD_USER_ID);
-            await member.timeout(null); // Remove timeout
-            selfMuteEndTime = null; // Clear self-mute tracking
-            message.reply('You have been unmuted! Now go commit some code!');
-            console.log(`Manually unmuted ${member.user.tag}`);
-        } catch (error) {
-            console.error('Error unmuting:', error);
-            message.reply('Failed to unmute. Please check bot permissions.');
-        }
-    }
-});
+//         try {
+//             const guild = await client.guilds.fetch(SERVER_ID);
+//             const member = await guild.members.fetch(DISCORD_USER_ID);
+//             await member.timeout(null); // Remove timeout
+//             selfMuteEndTime = null; // Clear self-mute tracking
+//             message.reply('You have been unmuted! Now go commit some code!');
+//             console.log(`Manually unmuted ${member.user.tag}`);
+//         } catch (error) {
+//             console.error('Error unmuting:', error);
+//             message.reply('Failed to unmute. Please check bot permissions.');
+//         }
+//     }
+// });
 
 client.login(process.env.DISCORD_TOKEN); 
