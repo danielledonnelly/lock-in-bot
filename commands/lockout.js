@@ -5,8 +5,7 @@ import { MESSAGES } from './encourage.js';
 export default {
     data: new SlashCommandBuilder()
         .setName('lockout')
-        .setDescription('Lock yourself out for an hour to focus on committing. Or go touch grass. It\'s up to you.')
-        .setDMPermission(false),
+        .setDescription('Lock yourself out for an hour to focus on committing. Or go touch grass. It\'s up to you.'),
     
     execute: async (interaction) => {
         if (interaction.user.id !== Config.DiscordUserID) {

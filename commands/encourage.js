@@ -19,9 +19,7 @@ export const MESSAGES = [
 export default {
     data: new SlashCommandBuilder()
         .setName('encourage')
-        .setDescription('Get a motivational message to help you lock in')
-        .setDMPermission(false),
-    
+        .setDescription('Get a motivational message to help you lock in'),
     execute: async (interaction) => {
         try {
             const randomMessage = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];

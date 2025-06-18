@@ -5,8 +5,7 @@ import { getCheckMode, setCheckMode } from './check.js';
 export default {
     data: new SlashCommandBuilder()
         .setName('switch')
-        .setDescription('Switch between daily and 8-hour mode')
-        .setDMPermission(false),
+        .setDescription('Switch between daily and 8-hour mode'),
     
     execute: async (interaction) => {
         if (interaction.user.id !== Config.DiscordUserID) {
