@@ -1,5 +1,6 @@
 import LongPing from './longping.js';
 import Ping from './ping.js';
+import Check from './check.js';
 
 import { Collection, REST, Routes } from 'discord.js';
 import Config from '../util/config.js';
@@ -7,6 +8,7 @@ import Config from '../util/config.js';
 const commands = [
     LongPing,
     Ping,
+    Check,
 ];
 
 export default {

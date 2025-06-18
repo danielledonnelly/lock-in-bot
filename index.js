@@ -14,7 +14,6 @@ const client = new Client({
 
 // Bot configuration
 let checkMode = 'daily'; // can be 'daily' or '8hour'
-let selfMuteEndTime = null; // Track when self-mute ends
 
 // Get date range based on check mode
 function getDateRange() {
@@ -48,12 +47,6 @@ function getDateRange() {
     }
 }
 
-// Function to check if user is currently self-muted
-function isSelfMuted() {
-    if (!selfMuteEndTime) return false;
-    return Date.now() < selfMuteEndTime;
-}
-
 // Function to check if user has committed
 async function checkCommitStatus() {
     const dateRange = getDateRange();
@@ -64,11 +57,11 @@ async function checkCommitStatus() {
 
     try {
         // Search for commits by the user within the time window
-        const query = `author:${GITHUB_USERNAME} committer-date:>${dateRange.start}`;
+        const query = `author:${Config.GithubUsername} committer-date:>${dateRange.start}`;
         console.log('GitHub search query:', query);
         const response = await fetch(`https://api.github.com/search/commits?q=${encodeURIComponent(query)}`, {
             headers: {
-                // 'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+                'Authorization': `token ${process.env.GITHUB_TOKEN}`,
                 'Accept': 'application/vnd.github.cloak-preview+json'
             }
         });
@@ -100,46 +93,20 @@ async function checkCommitStatus() {
     }
 }
 
-// TODO: You don't need to fetch these items. It is part of the interraction
-// Function to handle self-muting
-async function handleSelfMute(message, hours) {
-    try {
-        const guild = await client.guilds.fetch(Config.ServerID);
-        const member = await guild.members.fetch(Config.DiscordUserID);
-
-        if (message.author.id !== DISCORD_USER_ID) {
-            message.reply('You can only mute yourself, not others!');
-            return;
-        }
-
-        const milliseconds = hours * 60 * 60 * 1000;
-        selfMuteEndTime = Date.now() + milliseconds;
-        await member.timeout(milliseconds, `Self-muted for ${hours} hour(s)`);
-        message.reply(`You have been muted for ${hours} hour(s). Use this time to focus and get work done!`);
-        console.log(`Self-muted ${member.user.tag} for ${hours} hour(s)`);
-    } catch (error) {
-        console.error('Error setting self-mute timeout:', error);
-        message.reply('Failed to set mute. Please check bot permissions.');
-    }
-}
-
 // Function to mute/unmute user
 async function updateUserMuteStatus(hasCommitted) {
     try {
         const guild = await client.guilds.fetch(Config.ServerID);
         const member = await guild.members.fetch(Config.DiscordUserID);
 
-        // Don't unmute if user is self-muted
-        if (hasCommitted && !isSelfMuted()) {
+        if (hasCommitted) {
             console.log(`Found commit, unmuting ${member.user.tag}...`);
             await member.timeout(null); // Remove timeout
             console.log(`Unmuted ${member.user.tag} - Commit found`);
-        } else if (!hasCommitted && !isSelfMuted()) {
+        } else {
             console.log(`No commit found, muting ${member.user.tag}...`);
             await member.timeout(60 * 60 * 1000, 'No commit today'); // 1 hour timeout
             console.log(`Muted ${member.user.tag} - No commit today`);
-        } else if (isSelfMuted()) {
-            console.log(`Skipping mute update - user is self-muted until ${new Date(selfMuteEndTime).toLocaleString()}`);
         }
     } catch (error) {
         console.error('Error updating mute status:', error);
@@ -175,19 +142,19 @@ client.on(Events.InteractionCreate, async interaction => {
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
-    // // Check commit status every 5 minutes
-    // setInterval(async () => {
-    //     console.log(`Current mode: ${checkMode}`);
-    //     console.log('Running scheduled check...');
-    //     const hasCommitted = await checkCommitStatus();
-    //     await updateUserMuteStatus(hasCommitted);
-    // }, 5 * 60 * 1000); // 5 minutes in milliseconds
+    // Check commit status every 5 minutes
+    setInterval(async () => {
+        console.log(`Current mode: ${checkMode}`);
+        console.log('Running scheduled check...');
+        const hasCommitted = await checkCommitStatus();
+        await updateUserMuteStatus(hasCommitted);
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
 
-    // // Initial check
-    // console.log('Running initial check...');
-    // checkCommitStatus().then(hasCommitted => {
-    //     updateUserMuteStatus(hasCommitted);
-    // });
+    // Initial check
+    console.log('Running initial check...');
+    checkCommitStatus().then(hasCommitted => {
+        updateUserMuteStatus(hasCommitted);
+    });
 });
 
 // When changing modes, handle the transition
