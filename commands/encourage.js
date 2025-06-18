@@ -20,15 +20,27 @@ export const MESSAGES = [
 export default {
     data: new SlashCommandBuilder()
         .setName('encourage')
-        .setDescription('Get a motivational message to help you lock in'),
+        .setDescription('Get a motivational message to help you lock in')
+        .setDMPermission(false)
+        .setDefaultMemberPermissions(null),
     
     execute: async (interaction) => {
-        if (interaction.user.id !== Config.DiscordUserID) {
-            await interaction.reply({ content: 'You can only encourage yourself!', ephemeral: true });
-            return;
+        console.log('Encourage command triggered by user:', interaction.user.tag);
+        
+        try {
+            console.log('Selecting random message from', MESSAGES.length, 'available messages');
+            const randomMessage = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+            console.log('Selected message:', randomMessage);
+            
+            await interaction.reply(randomMessage);
+            console.log('Successfully sent encouragement message');
+        } catch (error) {
+            console.error('Error in encourage command:', error);
+            console.error('Full error details:', {
+                message: error.message,
+                stack: error.stack
+            });
+            await interaction.reply({ content: 'Failed to send encouragement message.', ephemeral: true });
         }
-
-        const randomMessage = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
-        await interaction.reply(randomMessage);
     }
 }
