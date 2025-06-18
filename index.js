@@ -1,14 +1,15 @@
-require('dotenv').config();
-const { Client, GatewayIntentBits, PermissionsBitField } = require('discord.js');
-const fetch = require('node-fetch');
+import "dotenv/config.js";
+import { Client, Collection, GatewayIntentBits, Events, PermissionsBitField } from 'discord.js';
+import fetch from 'node-fetch';
+import Commands from './commands/index.js';
+import Config from './util/config.js';
 
-const client = new Client({ 
+const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ] 
+        // GatewayIntentBits.GuildMessages,
+    ]
 });
 
 // Bot configuration
@@ -18,39 +19,34 @@ let selfMuteEndTime = null; // Track when self-mute ends
 // Get date range based on check mode
 function getDateRange() {
     const now = new Date();
-    
+
     if (checkMode === 'daily') {
         // Get start of today in NT (midnight NT)
         // NT is UTC-3:30, so midnight NT is 3:30 AM UTC
         const nowUTC = new Date();
         const ntOffset = -3.5 * 60; // NT is UTC-3:30 (in minutes)
         const nowNT = new Date(nowUTC.getTime() + (ntOffset * 60 * 1000));
-        
+
         // Get midnight NT in NT timezone
         const midnightNT = new Date(nowNT);
         midnightNT.setHours(0, 0, 0, 0);
-        
+
         // Convert midnight NT back to UTC
         const midnightUTC = new Date(midnightNT.getTime() - (ntOffset * 60 * 1000));
-        
+
         return {
-            start: midnightUTC.toISOString().split('.')[0]+'Z',
-            end: now.toISOString().split('.')[0]+'Z'
+            start: midnightUTC.toISOString().split('.')[0] + 'Z',
+            end: now.toISOString().split('.')[0] + 'Z'
         };
     } else {
         // Get 8 hours ago from now
         const eightHoursAgo = new Date(now.getTime() - (8 * 60 * 60 * 1000));
         return {
-            start: eightHoursAgo.toISOString().split('.')[0]+'Z',
-            end: now.toISOString().split('.')[0]+'Z'
+            start: eightHoursAgo.toISOString().split('.')[0] + 'Z',
+            end: now.toISOString().split('.')[0] + 'Z'
         };
     }
 }
-
-// These values should be set in your .env file
-const GITHUB_USERNAME = process.env.GITHUB_USERNAME || 'your-github-username';
-const DISCORD_USER_ID = process.env.DISCORD_USER_ID || 'your-discord-user-id';
-const SERVER_ID = process.env.SERVER_ID || 'your-server-id';
 
 // Function to check if user is currently self-muted
 function isSelfMuted() {
@@ -65,14 +61,14 @@ async function checkCommitStatus() {
     console.log(`Checking commits for ${timeWindow} between:`);
     console.log('Start:', dateRange.start);
     console.log('End:', dateRange.end);
-    
+
     try {
         // Search for commits by the user within the time window
         const query = `author:${GITHUB_USERNAME} committer-date:>${dateRange.start}`;
         console.log('GitHub search query:', query);
         const response = await fetch(`https://api.github.com/search/commits?q=${encodeURIComponent(query)}`, {
             headers: {
-                'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+                // 'Authorization': `token ${process.env.GITHUB_TOKEN}`,
                 'Accept': 'application/vnd.github.cloak-preview+json'
             }
         });
@@ -89,7 +85,7 @@ async function checkCommitStatus() {
 
         const data = await response.json();
         console.log('GitHub response:', JSON.stringify(data, null, 2));
-        
+
         const hasCommitted = data.total_count > 0;
         console.log(`Found ${data.total_count} commits in the ${timeWindow}`);
         console.log(`Commit status: ${hasCommitted ? 'Found commit' : 'No commit found'}`);
@@ -104,12 +100,13 @@ async function checkCommitStatus() {
     }
 }
 
+// TODO: You don't need to fetch these items. It is part of the interraction
 // Function to handle self-muting
 async function handleSelfMute(message, hours) {
     try {
-        const guild = await client.guilds.fetch(SERVER_ID);
-        const member = await guild.members.fetch(DISCORD_USER_ID);
-        
+        const guild = await client.guilds.fetch(Config.ServerID);
+        const member = await guild.members.fetch(Config.DiscordUserID);
+
         if (message.author.id !== DISCORD_USER_ID) {
             message.reply('You can only mute yourself, not others!');
             return;
@@ -129,9 +126,9 @@ async function handleSelfMute(message, hours) {
 // Function to mute/unmute user
 async function updateUserMuteStatus(hasCommitted) {
     try {
-        const guild = await client.guilds.fetch(SERVER_ID);
-        const member = await guild.members.fetch(DISCORD_USER_ID);
-        
+        const guild = await client.guilds.fetch(Config.ServerID);
+        const member = await guild.members.fetch(Config.DiscordUserID);
+
         // Don't unmute if user is self-muted
         if (hasCommitted && !isSelfMuted()) {
             console.log(`Found commit, unmuting ${member.user.tag}...`);
@@ -150,36 +147,61 @@ async function updateUserMuteStatus(hasCommitted) {
     }
 }
 
+Commands.init(client);
+
+// This triggers upon a slash command. It will check if it's correctly registered for your bot, then passes it to the execution function
+client.on(Events.InteractionCreate, async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = interaction.client.commands.get(interaction.commandName);
+
+    if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+    }
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+        } else {
+            await interaction.reply({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+        }
+    }
+});
+
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
-    
-    // Check commit status every 5 minutes
-    setInterval(async () => {
-        console.log(`Current mode: ${checkMode}`);
-        console.log('Running scheduled check...');
-        const hasCommitted = await checkCommitStatus();
-        await updateUserMuteStatus(hasCommitted);
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
-    
-    // Initial check
-    console.log('Running initial check...');
-    checkCommitStatus().then(hasCommitted => {
-        updateUserMuteStatus(hasCommitted);
-    });
+
+    // // Check commit status every 5 minutes
+    // setInterval(async () => {
+    //     console.log(`Current mode: ${checkMode}`);
+    //     console.log('Running scheduled check...');
+    //     const hasCommitted = await checkCommitStatus();
+    //     await updateUserMuteStatus(hasCommitted);
+    // }, 5 * 60 * 1000); // 5 minutes in milliseconds
+
+    // // Initial check
+    // console.log('Running initial check...');
+    // checkCommitStatus().then(hasCommitted => {
+    //     updateUserMuteStatus(hasCommitted);
+    // });
 });
 
 // When changing modes, handle the transition
 async function handleModeChange(newMode, message) {
     const oldMode = checkMode;
     checkMode = newMode;
-    
+
     // If switching between check modes, do an immediate check
     if (oldMode !== newMode) {
         console.log('Mode changed, running immediate check...');
         const hasCommitted = await checkCommitStatus();
         await updateUserMuteStatus(hasCommitted);
     }
-    
+
     if (newMode === 'daily') {
         message.reply('Switched to daily commit mode. You need one commit per day (NT) to avoid being muted.');
     } else if (newMode === '8hour') {
@@ -187,79 +209,85 @@ async function handleModeChange(newMode, message) {
     }
 }
 
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-    
-    // Handle self-mute commands
-    if (message.content === '!mute1hour') {
-        await handleSelfMute(message, 1);
-    } else if (message.content === '!mute2hour') {
-        await handleSelfMute(message, 2);
-    } else if (message.content === '!mute4hour') {
-        await handleSelfMute(message, 4);
-    } else if (message.content === '!mute8hour') {
-        await handleSelfMute(message, 8);
-    }
-    
-    // Handle mode commands
-    if (message.content.startsWith('!mode')) {
-        if (message.author.id !== DISCORD_USER_ID) {
-            message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
-            return;
-        }
-        
-        if (message.content === '!mode daily') {
-            await handleModeChange('daily', message);
-        } else if (message.content === '!mode 8hour') {
-            await handleModeChange('8hour', message);
-        } else if (message.content === '!mode') {
-            let currentMode;
-            if (checkMode === 'daily') {
-                currentMode = 'daily commit mode (one commit per day NT)';
-            } else {
-                currentMode = '8-hour window mode (one commit every 8 hours)';
-            }
-            message.reply(`Currently in ${currentMode}`);
-        }
-        return;
-    }
+/*
+    TODO:
+        split each of these into their own command
+        have the mute command take an argument
+        have the mode command take an argument
+*/
+// client.on('messageCreate', async (message) => {
+//     if (message.author.bot) return;
 
-    // Handle check command
-    if (message.content === '!check') {
-        if (message.author.id !== DISCORD_USER_ID) {
-            message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
-            return;
-        }
-        console.log('Manual check requested...');
-        const hasCommitted = await checkCommitStatus();
-        const timeWindow = checkMode === 'daily' ? 'today' : 'in the last 8 hours';
-        await updateUserMuteStatus(hasCommitted);
-        message.reply(hasCommitted ? `Congratulations, you have locked in! You have committed ${timeWindow}!` : `No commits found ${timeWindow}. Lock in now or you will be silenced.`);
-    }
+//     // Handle self-mute commands
+//     if (message.content === '!mute1hour') {
+//         await handleSelfMute(message, 1);
+//     } else if (message.content === '!mute2hour') {
+//         await handleSelfMute(message, 2);
+//     } else if (message.content === '!mute4hour') {
+//         await handleSelfMute(message, 4);
+//     } else if (message.content === '!mute8hour') {
+//         await handleSelfMute(message, 8);
+//     }
 
-    if (message.content === '!test') {
-        message.reply('Bot is working! Probably!');
-    }
+//     // Handle mode commands
+//     if (message.content.startsWith('!mode')) {
+//         if (message.author.id !== DISCORD_USER_ID) {
+//             message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
+//             return;
+//         }
 
-    // Handle unmute command for immediate relief
-    if (message.content === '!unmute') {
-        if (message.author.id !== DISCORD_USER_ID) {
-            message.reply('You can only unmute yourself!');
-            return;
-        }
-        
-        try {
-            const guild = await client.guilds.fetch(SERVER_ID);
-            const member = await guild.members.fetch(DISCORD_USER_ID);
-            await member.timeout(null); // Remove timeout
-            selfMuteEndTime = null; // Clear self-mute tracking
-            message.reply('You have been unmuted! Now go commit some code!');
-            console.log(`Manually unmuted ${member.user.tag}`);
-        } catch (error) {
-            console.error('Error unmuting:', error);
-            message.reply('Failed to unmute. Please check bot permissions.');
-        }
-    }
-});
+//         if (message.content === '!mode daily') {
+//             await handleModeChange('daily', message);
+//         } else if (message.content === '!mode 8hour') {
+//             await handleModeChange('8hour', message);
+//         } else if (message.content === '!mode') {
+//             let currentMode;
+//             if (checkMode === 'daily') {
+//                 currentMode = 'daily commit mode (one commit per day NT)';
+//             } else {
+//                 currentMode = '8-hour window mode (one commit every 8 hours)';
+//             }
+//             message.reply(`Currently in ${currentMode}`);
+//         }
+//         return;
+//     }
 
-client.login(process.env.DISCORD_TOKEN); 
+//     // Handle check command
+//     if (message.content === '!check') {
+//         if (message.author.id !== DISCORD_USER_ID) {
+//             message.reply('You can only lock yourself in, but you can\'t lock anyone else in!');
+//             return;
+//         }
+//         console.log('Manual check requested...');
+//         const hasCommitted = await checkCommitStatus();
+//         const timeWindow = checkMode === 'daily' ? 'today' : 'in the last 8 hours';
+//         await updateUserMuteStatus(hasCommitted);
+//         message.reply(hasCommitted ? `Congratulations, you have locked in! You have committed ${timeWindow}!` : `No commits found ${timeWindow}. Lock in now or you will be silenced.`);
+//     }
+
+//     if (message.content === '!test') {
+//         message.reply('Bot is working! Probably!');
+//     }
+
+//     // Handle unmute command for immediate relief
+//     if (message.content === '!unmute') {
+//         if (message.author.id !== DISCORD_USER_ID) {
+//             message.reply('You can only unmute yourself!');
+//             return;
+//         }
+
+//         try {
+//             const guild = await client.guilds.fetch(SERVER_ID);
+//             const member = await guild.members.fetch(DISCORD_USER_ID);
+//             await member.timeout(null); // Remove timeout
+//             selfMuteEndTime = null; // Clear self-mute tracking
+//             message.reply('You have been unmuted! Now go commit some code!');
+//             console.log(`Manually unmuted ${member.user.tag}`);
+//         } catch (error) {
+//             console.error('Error unmuting:', error);
+//             message.reply('Failed to unmute. Please check bot permissions.');
+//         }
+//     }
+// });
+
+client.login(Config.BotToken); 
