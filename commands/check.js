@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import Config from '../util/config.js';
 import fetch from 'node-fetch';
 
+// Track mode internally
 let checkMode = 'daily'; // can be 'daily' or '8hour'
 
 // Get date range based on check mode
@@ -103,26 +104,49 @@ async function updateUserMuteStatus(hasCommitted, interaction) {
     }
 }
 
+export function setCheckMode(newMode) {
+    checkMode = newMode;
+}
+
+export function getCheckMode() {
+    return checkMode;
+}
+
 export default {
     data: new SlashCommandBuilder()
         .setName('check')
         .setDescription('Check your commit status and update mute status'),
     
-    execute: async (interaction) => {
+    execute: async (interaction, skipReply = false) => {
         if (interaction.user.id !== Config.DiscordUserID) {
             await interaction.reply({ content: 'You can only check your own commit status!', ephemeral: true });
             return;
         }
 
-        await interaction.deferReply();
+        if (!skipReply) {
+            await interaction.deferReply();
+        }
+
+        // Get mode description
+        const modeDescription = checkMode === 'daily'
+            ? "Lock in Bot is currently in daily mode; this requires you to make at least one commit today to avoid being timed out"
+            : "Lock in Bot is currently in 8-hour mode; this requires you to make at least one commit every 8 hours to avoid being timed out";
+        
         console.log('Manual check requested...');
         const hasCommitted = await checkCommitStatus();
         const timeWindow = checkMode === 'daily' ? 'today' : 'in the last 8 hours';
         await updateUserMuteStatus(hasCommitted, interaction);
-        await interaction.editReply(
-            hasCommitted 
-                ? `Congratulations, you have locked in! You have committed ${timeWindow}!` 
-                : `No commits found ${timeWindow}. Lock in now or you will be silenced.`
-        );
+        
+        const statusMessage = hasCommitted 
+            ? `\n\nCongratulations, you have locked in! You have committed ${timeWindow}!` 
+            : `\n\nNo commits found ${timeWindow}. Lock in now or you will be silenced.`;
+
+        const fullMessage = `${modeDescription}${statusMessage}`;
+
+        if (skipReply) {
+            await interaction.followUp(fullMessage);
+        } else {
+            await interaction.editReply(fullMessage);
+        }
     }
 } 
