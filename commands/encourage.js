@@ -1,5 +1,4 @@
 import { SlashCommandBuilder } from 'discord.js';
-import Config from '../util/config.js';
 
 // yes these are ai-generated
 // they're supposed to be terrible
@@ -21,25 +20,15 @@ export default {
     data: new SlashCommandBuilder()
         .setName('encourage')
         .setDescription('Get a motivational message to help you lock in')
-        .setDMPermission(false)
-        .setDefaultMemberPermissions(null),
+        .setDMPermission(false),
     
     execute: async (interaction) => {
-        console.log('Encourage command triggered by user:', interaction.user.tag);
-        
         try {
-            console.log('Selecting random message from', MESSAGES.length, 'available messages');
             const randomMessage = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
-            console.log('Selected message:', randomMessage);
-            
             await interaction.reply(randomMessage);
-            console.log('Successfully sent encouragement message');
+            console.log('Sent encouragement to', interaction.user.tag);
         } catch (error) {
-            console.error('Error in encourage command:', error);
-            console.error('Full error details:', {
-                message: error.message,
-                stack: error.stack
-            });
+            console.error('Encourage command error:', error.message);
             await interaction.reply({ content: 'Failed to send encouragement message.', ephemeral: true });
         }
     }

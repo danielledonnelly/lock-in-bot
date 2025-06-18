@@ -4,7 +4,6 @@
 // const DISCORD_USER_ID = process.env.DISCORD_USER_ID || 'your-discord-user-id';
 // const SERVER_ID = process.env.SERVER_ID || 'your-server-id';
 
-
 export default {
     BotToken: process.env.DISCORD_TOKEN,
     ClientID: process.env.DISCORD_CLIENT_ID,
