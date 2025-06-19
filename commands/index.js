@@ -1,5 +1,5 @@
-import LongPing from './longping.js';
-import Ping from './ping.js';
+// import LongPing from './longping.js';
+// import Ping from './ping.js';
 import Check from './check.js';
 import Switch from './switch.js';
 import Encourage from './encourage.js';
@@ -9,8 +9,8 @@ import { Collection, REST, Routes } from 'discord.js';
 import Config from '../util/config.js';
 
 const commands = [
-    LongPing,
-    Ping,
+    // LongPing,
+    // Ping,
     Check,
     Switch,
     Encourage,
