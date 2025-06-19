@@ -129,8 +129,8 @@ export default {
 
         // Get mode description
         const modeDescription = checkMode === 'daily'
-            ? "Lock in Bot is currently in daily mode; this requires you to make at least one commit today to avoid being timed out"
-            : "Lock in Bot is currently in 8-hour mode; this requires you to make at least one commit every 8 hours to avoid being timed out";
+            ? "Lock in Bot is currently in daily mode; this requires you to make at least one commit today to avoid being timed out."
+            : "Lock in Bot is currently in 8-hour mode; this requires you to make at least one commit every 8 hours to avoid being timed out.";
         
         console.log('Manual check requested...');
         const hasCommitted = await checkCommitStatus();
