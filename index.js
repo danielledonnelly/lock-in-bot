@@ -4,6 +4,7 @@ import fetch from 'node-fetch';
 import Commands from './commands/index.js';
 import Config from './util/config.js';
 import { getCheckMode } from './commands/check.js';
+import { sendWeeklyReminder } from './commands/weekly-reminder.js';
 
 const client = new Client({
     intents: [
@@ -114,12 +115,16 @@ client.on(Events.InteractionCreate, async interaction => {
 // Handle process signals
 process.on('SIGTERM', async () => {
     console.log('Received SIGTERM. Cleaning up...');
+    clearInterval(checkInterval);
+    clearTimeout(weeklyReminderTimeout);
     await client.destroy();
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
     console.log('Received SIGINT. Cleaning up...');
+    clearInterval(checkInterval);
+    clearTimeout(weeklyReminderTimeout);
     await client.destroy();
     process.exit(0);
 });
@@ -130,6 +135,30 @@ process.on('unhandledRejection', (error) => {
 });
 
 let checkInterval;
+let weeklyReminderTimeout;
+
+// Function to schedule the next Monday reminder
+function scheduleNextMondayReminder() {
+    const now = new Date();
+    const nextMonday = new Date();
+    
+    // Set to next Monday at 9:00 AM
+    nextMonday.setDate(now.getDate() + ((7 - now.getDay() + 1) % 7 || 7));
+    nextMonday.setHours(9, 0, 0, 0);
+    
+    // If it's already past 9 AM Monday, schedule for next week
+    if (nextMonday <= now) {
+        nextMonday.setDate(nextMonday.getDate() + 7);
+    }
+    
+    const delay = nextMonday.getTime() - now.getTime();
+    console.log(`Scheduling next weekly reminder for ${nextMonday.toLocaleString()}`);
+    
+    weeklyReminderTimeout = setTimeout(() => {
+        sendWeeklyReminder(client);
+        scheduleNextMondayReminder(); // Schedule the next reminder
+    }, delay);
+}
 
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}`);
@@ -151,6 +180,9 @@ client.once('ready', async () => {
             console.error('Interval check error:', error.message);
         }
     }, 5 * 60 * 1000);
+
+    // Schedule the first weekly reminder
+    scheduleNextMondayReminder();
 });
 
 // Handle login errors

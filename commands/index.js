@@ -4,6 +4,7 @@ import Check from './check.js';
 import Switch from './switch.js';
 import Encourage from './encourage.js';
 import Lockout from './lockout.js';
+import WeeklyReminder from './weekly-reminder.js';
 
 import { Collection, REST, Routes } from 'discord.js';
 import Config from '../util/config.js';
@@ -15,6 +16,7 @@ const commands = [
     Switch,
     Encourage,
     Lockout,
+    WeeklyReminder,
 ];
 
 export default {
