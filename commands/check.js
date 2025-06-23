@@ -39,22 +39,32 @@ function getDateRange() {
 
 // Function to check if user has committed
 async function checkCommitStatus() {
+    return true; // Temporary override to unmute
+    
     const dateRange = getDateRange();
     const timeWindow = checkMode === 'daily' ? 'today (NT)' : 'last 8 hours';
     console.log(`Checking commits for ${timeWindow} between:`);
     console.log('Start:', dateRange.start);
     console.log('End:', dateRange.end);
+    console.log('GitHub Username:', Config.GithubUsername);
+    console.log('GitHub Token present:', !!process.env.GITHUB_TOKEN);
 
     try {
         // Search for commits by the user within the time window
         const query = `author:${Config.GithubUsername} committer-date:>${dateRange.start}`;
         console.log('GitHub search query:', query);
-        const response = await fetch(`https://api.github.com/search/commits?q=${encodeURIComponent(query)}`, {
+        const apiUrl = `https://api.github.com/search/commits?q=${encodeURIComponent(query)}`;
+        console.log('Full API URL:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
             headers: {
                 'Authorization': `token ${process.env.GITHUB_TOKEN}`,
                 'Accept': 'application/vnd.github.cloak-preview+json'
             }
         });
+
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
             console.error('GitHub API Error:', {
@@ -95,7 +105,7 @@ async function updateUserMuteStatus(hasCommitted, interaction) {
             console.log(`Unmuted ${member.user.tag} - Commit found`);
         } else {
             console.log(`No commit found, muting ${member.user.tag}...`);
-            await member.timeout(60 * 60 * 1000, 'No commit today'); // 1 hour timeout
+            await member.timeout(2 * 60 * 60 * 1000, 'No commit today'); // 2 hour timeout
             console.log(`Muted ${member.user.tag} - No commit today`);
         }
     } catch (error) {
