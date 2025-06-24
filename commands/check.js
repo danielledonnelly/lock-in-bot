@@ -39,8 +39,6 @@ function getDateRange() {
 
 // Function to check if user has committed
 async function checkCommitStatus() {
-    return true; // Temporary override to unmute
-    
     const dateRange = getDateRange();
     const timeWindow = checkMode === 'daily' ? 'today (NT)' : 'last 8 hours';
     console.log(`Checking commits for ${timeWindow} between:`);
@@ -98,6 +96,8 @@ async function updateUserMuteStatus(hasCommitted, interaction) {
     try {
         const guild = await interaction.client.guilds.fetch(Config.ServerID);
         const member = await guild.members.fetch(Config.DiscordUserID);
+        // I highly recommend setting up an exception channel so that you can still communicate with the bot in the event of a timeout, should you need to check anything.
+        const exceptionChannel = await guild.channels.fetch(Config.ExceptionChannelID);
 
         if (hasCommitted) {
             console.log(`Found commit, unmuting ${member.user.tag}...`);
@@ -105,8 +105,17 @@ async function updateUserMuteStatus(hasCommitted, interaction) {
             console.log(`Unmuted ${member.user.tag} - Commit found`);
         } else {
             console.log(`No commit found, muting ${member.user.tag}...`);
-            await member.timeout(2 * 60 * 60 * 1000, 'No commit today'); // 2 hour timeout
-            console.log(`Muted ${member.user.tag} - No commit today`);
+            // Set timeout for 1 hour
+            await member.timeout(60 * 60 * 1000, 'No commit today');
+            // Allow messages in exception channel
+            await exceptionChannel.permissionOverwrites.edit(member, {
+                SendMessages: true,
+                AddReactions: true,
+                CreatePublicThreads: true,
+                CreatePrivateThreads: true,
+                SendMessagesInThreads: true
+            });
+            console.log(`Muted ${member.user.tag} - No commit today (except in exception channel)`);
         }
     } catch (error) {
         console.error('Error updating mute status:', error);

@@ -11,4 +11,5 @@ export default {
     DiscordUserID: process.env.DISCORD_USER_ID,
     GithubUsername: process.env.GITHUB_USERNAME,
     ServerID: process.env.SERVER_ID,
+    ExceptionChannelID: process.env.EXCEPTION_CHANNEL_ID,
 }
