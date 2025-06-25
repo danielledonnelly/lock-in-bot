@@ -12,4 +12,5 @@ export default {
     GithubUsername: process.env.GITHUB_USERNAME,
     ServerID: process.env.SERVER_ID,
     ExceptionChannelID: process.env.EXCEPTION_CHANNEL_ID,
+    LimitChannelID: process.env.LIMIT_CHANNEL_ID,
 }

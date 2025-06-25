@@ -9,8 +9,26 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
     ]
 });
+
+// Track last message time in limited channel
+let lastMessageTime = null;
+
+// Function to check if it's a new day in NT timezone
+function isNewDay(lastTime) {
+    if (!lastTime) return true;
+    
+    const ntOffset = -3.5 * 60; // NT is UTC-3:30 (in minutes)
+    const lastNT = new Date(lastTime.getTime() + (ntOffset * 60 * 1000));
+    const nowNT = new Date(Date.now() + (ntOffset * 60 * 1000));
+    
+    return lastNT.getDate() !== nowNT.getDate() ||
+           lastNT.getMonth() !== nowNT.getMonth() ||
+           lastNT.getFullYear() !== nowNT.getFullYear();
+}
 
 // Get date range based on check mode
 function getDateRange() {
@@ -65,21 +83,47 @@ async function checkCommitStatus() {
     }
 }
 
-// Function to mute/unmute user
-async function updateUserMuteStatus(hasCommitted) {
+// Function to manage channel permissions
+async function updateChannelPermissions(hasCommitted, reason = 'No commit today') {
     try {
         const guild = await client.guilds.fetch(Config.ServerID);
         const member = await guild.members.fetch(Config.DiscordUserID);
+        
+        // Always ensure access to exception channel
+        const exceptionChannel = await guild.channels.fetch(Config.ExceptionChannelID);
+        await exceptionChannel.permissionOverwrites.edit(member, {
+            SendMessages: true,
+            AddReactions: true,
+            CreatePublicThreads: true,
+            CreatePrivateThreads: true,
+            SendMessagesInThreads: true
+        });
 
-        if (hasCommitted) {
-            await member.timeout(null); // Remove timeout
-            console.log(`Unmuted ${member.user.tag} - Commit found`);
+        if (!hasCommitted) {
+            // Get all channels and remove permissions except for exception channel
+            const channels = await guild.channels.fetch();
+            for (const [_, channel] of channels) {
+                if (channel.id !== Config.ExceptionChannelID) {
+                    await channel.permissionOverwrites.edit(member, {
+                        SendMessages: false,
+                        AddReactions: false,
+                        CreatePublicThreads: false,
+                        CreatePrivateThreads: false,
+                        SendMessagesInThreads: false
+                    });
+                }
+            }
+            console.log(`Limited channel access for ${member.user.tag} - ${reason}`);
         } else {
-            await member.timeout(60 * 60 * 1000, 'No commit today'); // 1 hour timeout
-            console.log(`Muted ${member.user.tag} - No commit found`);
+            // Restore permissions to all channels
+            const channels = await guild.channels.fetch();
+            for (const [_, channel] of channels) {
+                await channel.permissionOverwrites.delete(member);
+            }
+            console.log(`Restored channel access for ${member.user.tag} - Commit found`);
         }
     } catch (error) {
-        console.error('Mute status error:', error.message);
+        console.error('Permission update error:', error.message);
     }
 }
 
@@ -111,6 +155,40 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
+// Add message event handler
+client.on(Events.MessageCreate, async message => {
+    // Only check messages in the limit channel from the target user
+    if (message.channelId === Config.LimitChannelID && 
+        message.author.id === Config.DiscordUserID) {
+        
+        // Check if it's a new day
+        if (!isNewDay(lastMessageTime)) {
+            console.log('Daily message limit reached, restricting channel access...');
+            const channel = await client.channels.fetch(Config.LimitChannelID);
+            const member = await message.guild.members.fetch(Config.DiscordUserID);
+            
+            // Only timeout from the limit channel
+            await channel.permissionOverwrites.edit(member, {
+                SendMessages: false,
+                AddReactions: false,
+                CreatePublicThreads: false,
+                CreatePrivateThreads: false,
+                SendMessagesInThreads: false
+            });
+            
+            try {
+                await message.reply('You have reached your daily message limit in this channel. You will be unable to send messages here until tomorrow (NT).');
+            } catch (error) {
+                console.error('Failed to send limit message:', error);
+            }
+        } else {
+            // Update last message time
+            lastMessageTime = new Date();
+            console.log('Message limit updated for new day');
+        }
+    }
+});
+
 // Handle process signals
 process.on('SIGTERM', async () => {
     console.log('Received SIGTERM. Cleaning up...');
@@ -137,7 +215,7 @@ client.once('ready', async () => {
     // Initial check
     try {
         const hasCommitted = await checkCommitStatus();
-        await updateUserMuteStatus(hasCommitted);
+        await updateChannelPermissions(hasCommitted);
     } catch (error) {
         console.error('Initial check error:', error.message);
     }
@@ -146,7 +224,7 @@ client.once('ready', async () => {
     checkInterval = setInterval(async () => {
         try {
             const hasCommitted = await checkCommitStatus();
-            await updateUserMuteStatus(hasCommitted);
+            await updateChannelPermissions(hasCommitted);
         } catch (error) {
             console.error('Interval check error:', error.message);
         }
