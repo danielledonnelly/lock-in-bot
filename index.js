@@ -88,29 +88,34 @@ async function updateChannelPermissions(hasCommitted, reason = 'No commit today'
     try {
         const guild = await client.guilds.fetch(Config.ServerID);
         const member = await guild.members.fetch(Config.DiscordUserID);
-        
+
         // Always ensure access to exception channel
         const exceptionChannel = await guild.channels.fetch(Config.ExceptionChannelID);
-        await exceptionChannel.permissionOverwrites.edit(member, {
-            SendMessages: true,
-            AddReactions: true,
-            CreatePublicThreads: true,
-            CreatePrivateThreads: true,
-            SendMessagesInThreads: true
-        });
+        console.log('Ensuring exception channel access...');
+        try {
+            await exceptionChannel.permissionOverwrites.create(member, {
+                SendMessages: true,
+                ViewChannel: true
+            }, { reason: 'Ensuring exception channel access' });
+        } catch (error) {
+            console.error('Failed to set exception channel permissions:', error);
+            console.error('Bot permissions:', exceptionChannel.guild.members.me.permissions.toArray());
+            console.error('Channel permissions:', exceptionChannel.permissionsFor(client.user).toArray());
+        }
 
         if (!hasCommitted) {
             // Get all channels and remove permissions except for exception channel
             const channels = await guild.channels.fetch();
             for (const [_, channel] of channels) {
-                if (channel.id !== Config.ExceptionChannelID) {
-                    await channel.permissionOverwrites.edit(member, {
-                        SendMessages: false,
-                        AddReactions: false,
-                        CreatePublicThreads: false,
-                        CreatePrivateThreads: false,
-                        SendMessagesInThreads: false
-                    });
+                if (channel.id !== Config.ExceptionChannelID && channel.type === 0) { // type 0 is text channel
+                    try {
+                        await channel.permissionOverwrites.create(member, {
+                            SendMessages: false,
+                            ViewChannel: null // Don't change view access
+                        }, { reason: reason });
+                    } catch (error) {
+                        console.error(`Failed to update permissions for channel ${channel.name}:`, error);
+                    }
                 }
             }
             console.log(`Limited channel access for ${member.user.tag} - ${reason}`);
@@ -118,12 +123,23 @@ async function updateChannelPermissions(hasCommitted, reason = 'No commit today'
             // Restore permissions to all channels
             const channels = await guild.channels.fetch();
             for (const [_, channel] of channels) {
-                await channel.permissionOverwrites.delete(member);
+                if (channel.type === 0) { // type 0 is text channel
+                    try {
+                        await channel.permissionOverwrites.delete(member, { reason: 'Restoring default permissions' });
+                    } catch (error) {
+                        console.error(`Failed to restore permissions for channel ${channel.name}:`, error);
+                    }
+                }
             }
             console.log(`Restored channel access for ${member.user.tag} - Commit found`);
         }
     } catch (error) {
-        console.error('Permission update error:', error.message);
+        console.error('Permission update error:', error);
+        console.error('Full error details:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        });
     }
 }
 
@@ -164,22 +180,24 @@ client.on(Events.MessageCreate, async message => {
         // Check if it's a new day
         if (!isNewDay(lastMessageTime)) {
             console.log('Daily message limit reached, restricting channel access...');
-            const channel = await client.channels.fetch(Config.LimitChannelID);
-            const member = await message.guild.members.fetch(Config.DiscordUserID);
-            
-            // Only timeout from the limit channel
-            await channel.permissionOverwrites.edit(member, {
-                SendMessages: false,
-                AddReactions: false,
-                CreatePublicThreads: false,
-                CreatePrivateThreads: false,
-                SendMessagesInThreads: false
-            });
-            
             try {
+                const channel = await client.channels.fetch(Config.LimitChannelID);
+                const member = await message.guild.members.fetch(Config.DiscordUserID);
+                
+                // Only restrict access to the limit channel
+                await channel.permissionOverwrites.create(member, {
+                    SendMessages: false,
+                    ViewChannel: null // Don't change view access
+                }, { reason: 'Daily message limit reached' });
+                
                 await message.reply('You have reached your daily message limit in this channel. You will be unable to send messages here until tomorrow (NT).');
             } catch (error) {
-                console.error('Failed to send limit message:', error);
+                console.error('Failed to update limit channel permissions:', error);
+                console.error('Full error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    code: error.code
+                });
             }
         } else {
             // Update last message time
