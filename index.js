@@ -146,7 +146,7 @@ client.once('ready', async () => {
         console.error('Initial check error:', error.message);
     }
 
-    // Set up interval check - run every 5 minutes
+    // Set up interval check - run every 15 minutes
     checkInterval = setInterval(async () => {
         try {
             console.log('Running interval check...');
@@ -156,9 +156,9 @@ client.once('ready', async () => {
         } catch (error) {
             console.error('Interval check error:', error.message);
         }
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+    }, 15 * 60 * 1000); // 15 minutes in milliseconds
     
-    console.log('Auto-check interval started - will check every 5 minutes');
+    console.log('Auto-check interval started - will check every 15 minutes');
 });
 
 // Handle login errors
