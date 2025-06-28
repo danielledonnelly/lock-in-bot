@@ -5,6 +5,24 @@ import Commands from './commands/index.js';
 import Config from './util/config.js';
 import { getCheckMode } from './commands/check.js';
 
+console.log('Starting Lock-in Bot...');
+
+// Add startup checks
+if (!Config.BotToken) {
+    console.error('DISCORD_TOKEN is not set in environment variables!');
+    process.exit(1);
+}
+
+if (!Config.ClientID) {
+    console.error('DISCORD_CLIENT_ID is not set in environment variables!');
+    process.exit(1);
+}
+
+if (!Config.ServerID) {
+    console.error('SERVER_ID is not set in environment variables!');
+    process.exit(1);
+}
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -111,24 +129,45 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-// Handle process signals
-process.on('SIGTERM', async () => {
-    console.log('Received SIGTERM. Cleaning up...');
-    if (checkInterval) clearInterval(checkInterval);
-    await client.destroy();
-    process.exit(0);
-});
+// Improve signal handling
+let shuttingDown = false;
 
-process.on('SIGINT', async () => {
-    console.log('Received SIGINT. Cleaning up...');
-    if (checkInterval) clearInterval(checkInterval);
-    await client.destroy();
-    process.exit(0);
-});
+async function gracefulShutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    
+    console.log(`Received ${signal}. Starting graceful shutdown...`);
+    
+    try {
+        if (checkInterval) {
+            console.log('Clearing check interval...');
+            clearInterval(checkInterval);
+        }
+        
+        if (client) {
+            console.log('Destroying Discord client...');
+            await client.destroy();
+        }
+        
+        console.log('Shutdown complete.');
+        process.exit(0);
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+    }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle unhandled rejections
 process.on('unhandledRejection', (error) => {
-    console.error('Unhandled promise rejection:', error.message);
+    console.error('Unhandled promise rejection:', error);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error);
 });
 
 let checkInterval;
@@ -143,18 +182,20 @@ client.once('ready', async () => {
         await updateUserMuteStatus(hasCommitted);
         console.log('Initial check complete');
     } catch (error) {
-        console.error('Initial check error:', error.message);
+        console.error('Initial check error:', error);
     }
 
     // Set up interval check - run every 15 minutes
     checkInterval = setInterval(async () => {
+        if (shuttingDown) return;
+        
         try {
             console.log('Running interval check...');
             const hasCommitted = await checkCommitStatus();
             await updateUserMuteStatus(hasCommitted);
             console.log('Interval check complete');
         } catch (error) {
-            console.error('Interval check error:', error.message);
+            console.error('Interval check error:', error);
         }
     }, 15 * 60 * 1000); // 15 minutes in milliseconds
     
@@ -163,8 +204,10 @@ client.once('ready', async () => {
 
 // Handle login errors
 try {
+    console.log('Attempting to log in to Discord...');
     await client.login(Config.BotToken);
+    console.log('Successfully logged in to Discord');
 } catch (error) {
-    console.error('Failed to log in:', error.message);
+    console.error('Failed to log in:', error);
     process.exit(1);
 } 
