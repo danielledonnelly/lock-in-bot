@@ -1,91 +1,41 @@
-# GitHub Lock-in Bot
+# Lock-in Bot
 
-A Discord bot that keeps you accountable for daily GitHub commits by timing you out in Discord if you haven't committed today. The bot checks your GitHub activity every 5 minutes and:
-- Mutes you from a specific server for 1 hour if you haven't committed today
-- Unmutes you as soon as you make a commit
-- Works with both public and private repositories
+![Lock-in Bot](./images/thumbnail.png)
 
-## Setup Instructions
-Please note, this is intended for use in small personal servers, as you need a mod to approve of adding the bot and raising its role above yours in order for this to work.
+A Discord bot to help Dani lock in by tracking GitHub commits and managing server timeouts.
 
-### 1. Create a Discord Bot
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click "New Application" and give it a name
-3. Go to the "Bot" section
-4. Click "Add Bot"
-5. Under "Privileged Gateway Intents", enable:
-   - PRESENCE INTENT
-   - SERVER MEMBERS INTENT
-   - MESSAGE CONTENT INTENT
-6. Save your changes
-7. Copy your bot token (you'll need this later)
+## Features
 
-### 2. Create a GitHub Token
-1. Go to [GitHub Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens)
-2. Click "Generate new token (classic)"
-3. Give it a name (e.g., "Lock-in Bot")
-4. Select these permissions:
-   - `repo` (for private repository access)
-   - `read:user`
-5. Copy your token (you'll need this later)
-
-### 3. Get Your IDs
-1. In Discord, enable Developer Mode (User Settings > Advanced > Developer Mode)
-2. Right-click your username and "Copy User ID" - This is your `DISCORD_USER_ID`
-3. Right-click your server and "Copy Server ID" - This is your `SERVER_ID`
-4. Note your GitHub username - This is your `GITHUB_USERNAME`
-
-### 4. Deploy to Railway
-1. Use your repository created from the template
-2. Go to [Railway](https://railway.app/) (This is what I used, but you can opt to host wherever you wish)
-3. Create a new project
-4. Select "Deploy from GitHub repo"
-5. Choose your forked repository
-6. Add these environment variables in Railway:
-   - `DISCORD_TOKEN` (your Discord bot token)
-   - `GITHUB_TOKEN` (your GitHub personal access token)
-   - `GITHUB_USERNAME` (your GitHub username)
-   - `DISCORD_USER_ID` (your Discord user ID)
-   - `SERVER_ID` (your server ID)
-
-For local development:
-1. Create a `.env` file in your repository with the same variables:
-```env
-DISCORD_TOKEN=your-discord-token
-GITHUB_TOKEN=your-github-token
-GITHUB_USERNAME=your-github-username
-DISCORD_USER_ID=your-discord-user-id
-SERVER_ID=your-server-id
-```
-Note: The `.env` file is in `.gitignore` and won't be committed to GitHub.
-
-### 5. Add Bot to Your Server
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Select your application
-3. Go to OAuth2 > URL Generator
-4. Select scopes:
-   - `bot`
-   - `applications.commands`
-5. Select bot permissions:
-   - "Moderate Members"
-   - "Send Messages"
-   - "Read Message History"
-   - "View Channels"
-6. Copy the generated URL
-7. Open it in a browser
-8. Select your server and authorize
-
-### 6. Final Setup
-1. In your Discord server, make sure the bot's role is ABOVE your role in the role hierarchy
-2. Test the bot by typing `!check` in any channel
+- **Commit Tracking**: Automatically checks for daily GitHub commits
+- **Auto-Timeout**: Times out users who haven't committed 
+- **Flexible Modes**: Daily or 8-hour checking modes
+- **Exception Channels**: Maintains access to designated channels even when timed out
+- **Manual Commands**: Check commit status, switch modes, and get encouragement
 
 ## Commands
-- `!check` - Manually check if you've committed today
 
-## Troubleshooting
-- If the bot can't mute you, make sure its role is above your role in the server settings
-- If commits aren't being detected, verify your GitHub token has the correct permissions
-- The bot needs to be able to see the channels where commands are used
+- `/check` - Check your commit status and update timeout
+- `/switch` - Switch between daily and 8-hour modes
+- `/encourage` - Get motivational messages
+- `/lockout` - Manual timeout management
 
-## Contributing
-Feel free to submit issues. This is both my first time making a Discord bot and my first time sharing this type of public project so please be patient with me if anything is missing or off. Feedback is welcome!
+## Setup
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up your environment variables in `.env`:
+   ```
+   DISCORD_TOKEN=your_bot_token
+   DISCORD_CLIENT_ID=your_client_id
+   DISCORD_USER_ID=your_user_id
+   SERVER_ID=your_server_id
+   GITHUB_USERNAME=your_github_username
+   GITHUB_TOKEN=your_github_token
+   EXCEPTION_CHANNEL_ID=channel_id_for_testing
+   DEBUG=false
+   ```
+4. Run the bot: `npm start`
+
+## License
+
+MIT License
