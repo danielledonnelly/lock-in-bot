@@ -1,5 +1,5 @@
 import "dotenv/config.js";
-import { Client, Collection, GatewayIntentBits, Events, PermissionsBitField } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, Events } from 'discord.js';
 import fetch from 'node-fetch';
 import Commands from './commands/index.js';
 import Config from './util/config.js';
@@ -9,26 +9,8 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
     ]
 });
-
-// Track last message time in limited channel
-let lastMessageTime = null;
-
-// Function to check if it's a new day in NT timezone
-function isNewDay(lastTime) {
-    if (!lastTime) return true;
-    
-    const ntOffset = -3.5 * 60; // NT is UTC-3:30 (in minutes)
-    const lastNT = new Date(lastTime.getTime() + (ntOffset * 60 * 1000));
-    const nowNT = new Date(Date.now() + (ntOffset * 60 * 1000));
-    
-    return lastNT.getDate() !== nowNT.getDate() ||
-           lastNT.getMonth() !== nowNT.getMonth() ||
-           lastNT.getFullYear() !== nowNT.getFullYear();
-}
 
 // Get date range based on check mode
 function getDateRange() {
@@ -83,63 +65,21 @@ async function checkCommitStatus() {
     }
 }
 
-// Function to manage channel permissions
-async function updateChannelPermissions(hasCommitted, reason = 'No commit today') {
+// Function to mute/unmute user
+async function updateUserMuteStatus(hasCommitted) {
     try {
         const guild = await client.guilds.fetch(Config.ServerID);
         const member = await guild.members.fetch(Config.DiscordUserID);
 
-        // Always ensure access to exception channel
-        const exceptionChannel = await guild.channels.fetch(Config.ExceptionChannelID);
-        console.log('Ensuring exception channel access...');
-        try {
-            await exceptionChannel.permissionOverwrites.create(member, {
-                SendMessages: true,
-                ViewChannel: true
-            }, { reason: 'Ensuring exception channel access' });
-        } catch (error) {
-            console.error('Failed to set exception channel permissions:', error);
-            console.error('Bot permissions:', exceptionChannel.guild.members.me.permissions.toArray());
-            console.error('Channel permissions:', exceptionChannel.permissionsFor(client.user).toArray());
-        }
-
-        if (!hasCommitted) {
-            // Get all channels and remove permissions except for exception channel
-            const channels = await guild.channels.fetch();
-            for (const [_, channel] of channels) {
-                if (channel.id !== Config.ExceptionChannelID && channel.type === 0) { // type 0 is text channel
-                    try {
-                        await channel.permissionOverwrites.create(member, {
-                            SendMessages: false,
-                            ViewChannel: null // Don't change view access
-                        }, { reason: reason });
-                    } catch (error) {
-                        console.error(`Failed to update permissions for channel ${channel.name}:`, error);
-                    }
-                }
-            }
-            console.log(`Limited channel access for ${member.user.tag} - ${reason}`);
+        if (hasCommitted) {
+            await member.timeout(null); // Remove timeout
+            console.log(`Unmuted ${member.user.tag} - Commit found`);
         } else {
-            // Restore permissions to all channels
-            const channels = await guild.channels.fetch();
-            for (const [_, channel] of channels) {
-                if (channel.type === 0) { // type 0 is text channel
-                    try {
-                        await channel.permissionOverwrites.delete(member, { reason: 'Restoring default permissions' });
-                    } catch (error) {
-                        console.error(`Failed to restore permissions for channel ${channel.name}:`, error);
-                    }
-                }
-            }
-            console.log(`Restored channel access for ${member.user.tag} - Commit found`);
+            await member.timeout(60 * 60 * 1000, 'No commit today'); // 1 hour timeout
+            console.log(`Muted ${member.user.tag} - No commit found`);
         }
     } catch (error) {
-        console.error('Permission update error:', error);
-        console.error('Full error details:', {
-            message: error.message,
-            stack: error.stack,
-            code: error.code
-        });
+        console.error('Mute status error:', error.message);
     }
 }
 
@@ -171,51 +111,17 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-// Add message event handler
-client.on(Events.MessageCreate, async message => {
-    // Only check messages in the limit channel from the target user
-    if (message.channelId === Config.LimitChannelID && 
-        message.author.id === Config.DiscordUserID) {
-        
-        // Check if it's a new day
-        if (!isNewDay(lastMessageTime)) {
-            console.log('Daily message limit reached, restricting channel access...');
-            try {
-                const channel = await client.channels.fetch(Config.LimitChannelID);
-                const member = await message.guild.members.fetch(Config.DiscordUserID);
-                
-                // Only restrict access to the limit channel
-                await channel.permissionOverwrites.create(member, {
-                    SendMessages: false,
-                    ViewChannel: null // Don't change view access
-                }, { reason: 'Daily message limit reached' });
-                
-                await message.reply('You have reached your daily message limit in this channel. You will be unable to send messages here until tomorrow (NT).');
-            } catch (error) {
-                console.error('Failed to update limit channel permissions:', error);
-                console.error('Full error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    code: error.code
-                });
-            }
-        } else {
-            // Update last message time
-            lastMessageTime = new Date();
-            console.log('Message limit updated for new day');
-        }
-    }
-});
-
 // Handle process signals
 process.on('SIGTERM', async () => {
     console.log('Received SIGTERM. Cleaning up...');
+    if (checkInterval) clearInterval(checkInterval);
     await client.destroy();
     process.exit(0);
 });
 
 process.on('SIGINT', async () => {
     console.log('Received SIGINT. Cleaning up...');
+    if (checkInterval) clearInterval(checkInterval);
     await client.destroy();
     process.exit(0);
 });
@@ -232,21 +138,27 @@ client.once('ready', async () => {
 
     // Initial check
     try {
+        console.log('Running initial check...');
         const hasCommitted = await checkCommitStatus();
-        await updateChannelPermissions(hasCommitted);
+        await updateUserMuteStatus(hasCommitted);
+        console.log('Initial check complete');
     } catch (error) {
         console.error('Initial check error:', error.message);
     }
 
-    // Set up interval check
+    // Set up interval check - run every 5 minutes
     checkInterval = setInterval(async () => {
         try {
+            console.log('Running interval check...');
             const hasCommitted = await checkCommitStatus();
-            await updateChannelPermissions(hasCommitted);
+            await updateUserMuteStatus(hasCommitted);
+            console.log('Interval check complete');
         } catch (error) {
             console.error('Interval check error:', error.message);
         }
-    }, 5 * 60 * 1000);
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+    
+    console.log('Auto-check interval started - will check every 5 minutes');
 });
 
 // Handle login errors
