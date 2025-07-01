@@ -13,4 +13,8 @@ export default {
     ServerID: process.env.SERVER_ID,
     ExceptionChannelID: process.env.EXCEPTION_CHANNEL_ID,
     LimitChannelID: process.env.LIMIT_CHANNEL_ID,
+    GoalChannelID: process.env.GOAL_CHANNEL_ID,
+    DaniDiscordID: process.env.DANI_DISCORD_ID,
+    MaddieDiscordID: process.env.MADDIE_DISCORD_ID,
+    JoshDiscordID: process.env.JOSH_DISCORD_ID,
 }

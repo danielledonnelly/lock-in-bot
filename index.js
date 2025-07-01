@@ -1,6 +1,7 @@
 import "dotenv/config.js";
 import { Client, Collection, GatewayIntentBits, Events } from 'discord.js';
 import fetch from 'node-fetch';
+import cron from 'node-cron';
 import Commands from './commands/index.js';
 import Config from './util/config.js';
 import { getCheckMode } from './commands/check.js';
@@ -132,45 +133,36 @@ client.on(Events.InteractionCreate, async interaction => {
 // Improve signal handling
 let shuttingDown = false;
 
-async function gracefulShutdown(signal) {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    
-    console.log(`Received ${signal}. Starting graceful shutdown...`);
-    
+// Weekly reminder function
+async function sendWeeklyReminder() {
     try {
-        if (checkInterval) {
-            console.log('Clearing check interval...');
-            clearInterval(checkInterval);
-        }
+        console.log('Sending weekly reminder...');
         
-        if (client) {
-            console.log('Destroying Discord client...');
-            await client.destroy();
+        const channel = await client.channels.fetch(Config.GoalChannelID);
+        if (!channel) {
+            console.error('Goal channel not found!');
+            return;
         }
-        
-        console.log('Shutdown complete.');
-        process.exit(0);
+
+        const message = `📅 **Weekly Check-in Time!** 📅
+
+Hey <@${Config.DaniDiscordID}>, <@${Config.MaddieDiscordID}>, and <@${Config.JoshDiscordID}>! 
+
+It's Tuesday 1PM NT - time for our weekly goals check-in! 🎯
+
+How did everyone do with their goals this week? Share your wins, challenges, and what you're planning for the week ahead! 💪
+
+#LockIn #WeeklyGoals #Accountability`;
+
+        await channel.send(message);
+        console.log('Weekly reminder sent successfully!');
     } catch (error) {
-        console.error('Error during shutdown:', error);
-        process.exit(1);
+        console.error('Error sending weekly reminder:', error);
     }
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// Handle unhandled rejections
-process.on('unhandledRejection', (error) => {
-    console.error('Unhandled promise rejection:', error);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught exception:', error);
-});
-
 let checkInterval;
+let weeklyReminderJob;
 
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}`);
@@ -200,6 +192,60 @@ client.once('ready', async () => {
     }, 15 * 60 * 1000); // 15 minutes in milliseconds
     
     console.log('Auto-check interval started - will check every 15 minutes');
+
+    // Set up weekly reminder - Every Tuesday at 1:00 PM NT
+    // NT is UTC-3:30, so 1:00 PM NT = 4:30 PM UTC
+    // Cron format: minute hour day-of-month month day-of-week
+    // Tuesday = 2 in cron (0=Sunday, 1=Monday, 2=Tuesday, etc.)
+    weeklyReminderJob = cron.schedule('30 16 * * 2', sendWeeklyReminder, {
+        scheduled: true,
+        timezone: "UTC"
+    });
+    
+    console.log('Weekly reminder scheduled for Tuesdays at 1:00 PM NT (4:30 PM UTC)');
+});
+
+async function gracefulShutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    
+    console.log(`Received ${signal}. Starting graceful shutdown...`);
+    
+    try {
+        if (checkInterval) {
+            console.log('Clearing check interval...');
+            clearInterval(checkInterval);
+        }
+        
+        if (weeklyReminderJob) {
+            console.log('Stopping weekly reminder job...');
+            weeklyReminderJob.stop();
+        }
+        
+        if (client) {
+            console.log('Destroying Discord client...');
+            await client.destroy();
+        }
+        
+        console.log('Shutdown complete.');
+        process.exit(0);
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+    }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle unhandled rejections
+process.on('unhandledRejection', (error) => {
+    console.error('Unhandled promise rejection:', error);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error);
 });
 
 // Handle login errors

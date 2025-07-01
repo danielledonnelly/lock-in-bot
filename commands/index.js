@@ -4,6 +4,7 @@ import Check from './check.js';
 import Switch from './switch.js';
 import Encourage from './encourage.js';
 import Lockout from './lockout.js';
+import TestReminder from './testreminder.js';
 import CheckPerms from './checkperms.js';
 
 import { Collection, REST, Routes } from 'discord.js';
@@ -16,6 +17,7 @@ const commands = [
     Switch,
     Encourage,
     Lockout,
+    TestReminder,
     CheckPerms,
 ];
 
