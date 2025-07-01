@@ -1,3 +1,5 @@
+// This is a work in progress command specific to a specific channel that I use personally.
+
 import { SlashCommandBuilder } from 'discord.js';
 import Config from '../util/config.js';
 
