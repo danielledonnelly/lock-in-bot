@@ -193,16 +193,16 @@ client.once('ready', async () => {
     
     console.log('Auto-check interval started - will check every 15 minutes');
 
-    // Set up weekly reminder - Every Tuesday at 1:00 PM NT
-    // NT is UTC-3:30, so 1:00 PM NT = 4:30 PM UTC
+    // Set up weekly reminder - Every Wednesday at 2:00 PM NT
+    // NT is UTC-3:30, so 2:00 PM NT = 5:30 PM UTC
     // Cron format: minute hour day-of-month month day-of-week
-    // Tuesday = 2 in cron (0=Sunday, 1=Monday, 2=Tuesday, etc.)
-    weeklyReminderJob = cron.schedule('30 16 * * 2', sendWeeklyReminder, {
+    // Wednesday = 3 in cron (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, etc.)
+    weeklyReminderJob = cron.schedule('30 17 * * 3', sendWeeklyReminder, {
         scheduled: true,
         timezone: "UTC"
     });
     
-    console.log('Weekly reminder scheduled for Tuesdays at 1:00 PM NT (4:30 PM UTC)');
+    console.log('Weekly reminder scheduled for Wednesdays at 2:00 PM NT (5:30 PM UTC)');
 });
 
 async function gracefulShutdown(signal) {
