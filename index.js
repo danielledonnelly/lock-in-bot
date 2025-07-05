@@ -84,21 +84,25 @@ async function checkCommitStatus() {
     }
 }
 
-// Function to mute/unmute user
-async function updateUserMuteStatus(hasCommitted) {
+// Function to manage lockout role
+async function updateLockStatus(hasCommitted) {
     try {
         const guild = await client.guilds.fetch(Config.ServerID);
         const member = await guild.members.fetch(Config.DiscordUserID);
 
-        if (hasCommitted) {
-            await member.timeout(null); // Remove timeout
-            console.log(`Unmuted ${member.user.tag} - Commit found`);
-        } else {
-            await member.timeout(60 * 60 * 1000, 'No commit today'); // 1 hour timeout
-            console.log(`Muted ${member.user.tag} - No commit found`);
+        const hasRole = member.roles.cache.has(Config.LockedOutRoleID);
+
+        if (hasCommitted && hasRole) {
+            await member.roles.remove(Config.LockedOutRoleID, 'Commit found - removing lockout');
+            console.log(`Removed Locked Out role from ${member.user.tag}`);
+        }
+
+        if (!hasCommitted && !hasRole) {
+            await member.roles.add(Config.LockedOutRoleID, 'No commit today - applying lockout');
+            console.log(`Added Locked Out role to ${member.user.tag}`);
         }
     } catch (error) {
-        console.error('Mute status error:', error.message);
+        console.error('Lockout role update error:', error);
     }
 }
 
@@ -171,7 +175,7 @@ client.once('ready', async () => {
     try {
         console.log('Running initial check...');
         const hasCommitted = await checkCommitStatus();
-        await updateUserMuteStatus(hasCommitted);
+        await updateLockStatus(hasCommitted);
         console.log('Initial check complete');
     } catch (error) {
         console.error('Initial check error:', error);
@@ -184,12 +188,12 @@ client.once('ready', async () => {
         try {
             console.log('Running interval check...');
             const hasCommitted = await checkCommitStatus();
-            await updateUserMuteStatus(hasCommitted);
+            await updateLockStatus(hasCommitted);
             console.log('Interval check complete');
         } catch (error) {
             console.error('Interval check error:', error);
         }
-    }, 15 * 60 * 1000); // 15 minutes in milliseconds
+    }, 15 * 60 * 1000); // 15 minutes
     
     console.log('Auto-check interval started - will check every 15 minutes');
 

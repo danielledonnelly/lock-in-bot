@@ -17,4 +17,5 @@ export default {
     DaniDiscordID: process.env.DANI_DISCORD_ID,
     MaddieDiscordID: process.env.MADDIE_DISCORD_ID,
     JoshDiscordID: process.env.JOSH_DISCORD_ID,
+    LockedOutRoleID: process.env.LOCKED_OUT_ROLE_ID,
 }
