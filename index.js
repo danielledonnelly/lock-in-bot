@@ -176,6 +176,9 @@ client.once('ready', async () => {
         console.log('Running initial check...');
         const hasCommitted = await checkCommitStatus();
         await updateLockStatus(hasCommitted);
+        const guild = await client.guilds.fetch(Config.ServerID);
+        const member = await guild.members.fetch(Config.DiscordUserID);
+        console.log(`Initial status for ${member.user.tag}: ${hasCommitted ? 'Committed today ✅' : 'No commit yet ❌'}`);
         console.log('Initial check complete');
     } catch (error) {
         console.error('Initial check error:', error);
@@ -189,6 +192,9 @@ client.once('ready', async () => {
             console.log('Running interval check...');
             const hasCommitted = await checkCommitStatus();
             await updateLockStatus(hasCommitted);
+            const guild = await client.guilds.fetch(Config.ServerID);
+            const member = await guild.members.fetch(Config.DiscordUserID);
+            console.log(`Status for ${member.user.tag}: ${hasCommitted ? 'Committed ✅' : 'No commit ❌'}`);
             console.log('Interval check complete');
         } catch (error) {
             console.error('Interval check error:', error);

@@ -27,25 +27,6 @@ export default {
         const rest = new REST().setToken(Config.BotToken);
 
         try {
-            // First, delete all existing commands (both global and guild-specific)
-            console.log('Deleting existing commands...');
-            
-            // Delete global commands
-            await rest.put(
-                Routes.applicationCommands(Config.ClientID),
-                { body: [] }
-            );
-            
-            // Delete guild-specific commands
-            if (Config.ServerID) {
-                await rest.put(
-                    Routes.applicationGuildCommands(Config.ClientID, Config.ServerID),
-                    { body: [] }
-                );
-            }
-            
-            console.log('Successfully deleted all existing commands.');
-
             // Now proceed with registering new commands
             client.commands = new Collection();
 
@@ -60,13 +41,8 @@ export default {
             }
 
             // Register new commands (either globally or to guild based on Debug setting)
-            const commandRoute = Config.Debug ? Routes.applicationGuildCommands(Config.ClientID, Config.ServerID) : Routes.applicationCommands(Config.ClientID);
-            const data = await rest.put(
-                commandRoute,
-                { body: applicationCommands },
-            );
-
-            console.log(`Successfully registered ${data.length} application (/) commands.`);
+            // Registration disabled – assume commands are already registered in Discord.
+            console.log(`Commands loaded into client collection (${applicationCommands.length}). Registration skipped.`);
         } catch (error) {
             console.error('Error during command setup:', error);
         }
