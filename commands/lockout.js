@@ -17,9 +17,25 @@ export default {
             const guild = await interaction.client.guilds.fetch(Config.ServerID);
             const member = await guild.members.fetch(Config.DiscordUserID);
             
-            // 1 hour timeout
-            await member.timeout(60 * 60 * 1000, 'Self-imposed lockout to focus');
-            
+            // 1-hour role lockout instead of timeout
+            // Add Locked Out role
+            if (!member.roles.cache.has(Config.LockedOutRoleID)) {
+                await member.roles.add(Config.LockedOutRoleID, 'Self-imposed lockout to focus');
+            }
+
+            // Schedule removal after 1 hour
+            setTimeout(async () => {
+                try {
+                    const refreshedMember = await guild.members.fetch(Config.DiscordUserID);
+                    if (refreshedMember.roles.cache.has(Config.LockedOutRoleID)) {
+                        await refreshedMember.roles.remove(Config.LockedOutRoleID, 'Lockout duration ended');
+                        console.log('Self-lockout role removed after 1 hour');
+                    }
+                } catch (err) {
+                    console.error('Error removing lockout role after 1h:', err);
+                }
+            }, 60 * 60 * 1000);
+
             // Get a random encouragement message
             const randomMessage = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
             
