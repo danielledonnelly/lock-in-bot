@@ -7,6 +7,7 @@ import Config from './util/config.js';
 import { getCheckMode } from './commands/check.js';
 
 console.log('Starting Lock-in Bot...');
+console.log('LockedOutRoleID loaded:', Config.LockedOutRoleID);
 
 // Add startup checks
 if (!Config.BotToken) {

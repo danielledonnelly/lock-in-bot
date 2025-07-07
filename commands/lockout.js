@@ -5,45 +5,44 @@ import { MESSAGES } from './encourage.js';
 export default {
     data: new SlashCommandBuilder()
         .setName('lockout')
-        .setDescription('Lock yourself out for an hour to focus on committing or go touch grass'),
-    
+        .setDescription('Give yourself the Locked Out role for 1 hour to focus'),
+
     execute: async (interaction) => {
         if (interaction.user.id !== Config.DiscordUserID) {
             await interaction.reply({ content: 'You can only lock yourself out!', ephemeral: true });
             return;
         }
 
+        await interaction.deferReply({ ephemeral: true });
+
         try {
             const guild = await interaction.client.guilds.fetch(Config.ServerID);
             const member = await guild.members.fetch(Config.DiscordUserID);
-            
-            // 1-hour role lockout instead of timeout
-            // Add Locked Out role
+
+            // Add role if not present
             if (!member.roles.cache.has(Config.LockedOutRoleID)) {
-                await member.roles.add(Config.LockedOutRoleID, 'Self-imposed lockout to focus');
+                console.log('Adding Locked Out role via /lockout');
+                await member.roles.add(Config.LockedOutRoleID, 'Self-imposed lockout');
             }
 
-            // Schedule removal after 1 hour
+            // Schedule removal after 1 hour (3600 000 ms)
             setTimeout(async () => {
                 try {
-                    const refreshedMember = await guild.members.fetch(Config.DiscordUserID);
-                    if (refreshedMember.roles.cache.has(Config.LockedOutRoleID)) {
-                        await refreshedMember.roles.remove(Config.LockedOutRoleID, 'Lockout duration ended');
-                        console.log('Self-lockout role removed after 1 hour');
+                    const refreshed = await guild.members.fetch(Config.DiscordUserID);
+                    if (refreshed.roles.cache.has(Config.LockedOutRoleID)) {
+                        await refreshed.roles.remove(Config.LockedOutRoleID, 'Lockout duration ended');
+                        console.log('Locked Out role automatically removed after 1h via /lockout');
                     }
                 } catch (err) {
-                    console.error('Error removing lockout role after 1h:', err);
+                    console.error('Error removing Locked Out role after 1h:', err);
                 }
             }, 60 * 60 * 1000);
 
-            // Get a random encouragement message
             const randomMessage = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
-            
-            await interaction.reply(`You've been locked out for 1 hour. Use this time to focus and commit!\n\n${randomMessage}`);
-            console.log(`${member.user.tag} locked themselves out for an hour`);
+            await interaction.editReply(`Locked Out role applied for 1 hour. Focus time!\n\n${randomMessage}`);
         } catch (error) {
-            console.error('Lockout command error:', error.message);
-            await interaction.reply({ content: 'Failed to set lockout. Please check bot permissions.', ephemeral: true });
+            console.error('Lockout command error:', error);
+            await interaction.editReply({ content: 'Failed to apply Locked Out role. Check bot permissions or role hierarchy.', ephemeral: true });
         }
     }
-} 
+}; 
