@@ -62,25 +62,82 @@ function getDateRange() {
 async function checkCommitStatus() {
     const dateRange = getDateRange();
     const checkMode = getCheckMode();
+    const timeWindow = checkMode === 'daily' ? 'today (NT)' : 'last 8 hours';
+    
+    console.log(`\n=== COMMIT CHECK DEBUG ===`);
+    console.log(`Checking commits for ${timeWindow} between:`);
+    console.log('Start:', dateRange.start);
+    console.log('End:', dateRange.end);
+    console.log('GitHub Username:', Config.GithubUsername);
+    console.log('GitHub Token present:', !!process.env.GITHUB_TOKEN);
+    console.log('GitHub Token length:', process.env.GITHUB_TOKEN ? process.env.GITHUB_TOKEN.length : 'N/A');
 
     try {
         const query = `author:${Config.GithubUsername} committer-date:>${dateRange.start}`;
-        const response = await fetch(`https://api.github.com/search/commits?q=${encodeURIComponent(query)}`, {
+        console.log('GitHub search query:', query);
+        
+        const apiUrl = `https://api.github.com/search/commits?q=${encodeURIComponent(query)}`;
+        console.log('Full API URL:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
             headers: {
                 'Authorization': `token ${process.env.GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.cloak-preview+json'
+                'Accept': 'application/vnd.github.cloak-preview+json',
+                'User-Agent': 'Lock-in-Bot'
             }
         });
 
+        console.log('Response status:', response.status);
+        console.log('Response status text:', response.statusText);
+        
+        // Log rate limit headers
+        console.log('Rate limit remaining:', response.headers.get('x-ratelimit-remaining'));
+        console.log('Rate limit reset:', response.headers.get('x-ratelimit-reset'));
+
         if (!response.ok) {
-            console.error('GitHub API Error:', response.status, response.statusText);
+            console.error('GitHub API Error Details:');
+            console.error('Status:', response.status);
+            console.error('Status Text:', response.statusText);
+            
+            const errorBody = await response.text();
+            console.error('Error Response Body:', errorBody);
+            
+            // Try to parse as JSON for more details
+            try {
+                const errorJson = JSON.parse(errorBody);
+                console.error('Parsed Error:', errorJson);
+            } catch (e) {
+                console.error('Could not parse error as JSON');
+            }
+            
             return false;
         }
 
         const data = await response.json();
+        console.log('GitHub API Response:');
+        console.log('Total count:', data.total_count);
+        console.log('Incomplete results:', data.incomplete_results);
+        
+        if (data.items && data.items.length > 0) {
+            console.log('Found commits:');
+            data.items.forEach((commit, index) => {
+                console.log(`  ${index + 1}. ${commit.commit.message.split('\n')[0]} (${commit.commit.author.date})`);
+                console.log(`     Repository: ${commit.repository.full_name}`);
+                console.log(`     Author: ${commit.commit.author.name} <${commit.commit.author.email}>`);
+            });
+        } else {
+            console.log('No commits found in the response');
+        }
+        
+        console.log(`=== END DEBUG ===\n`);
+        
         return data.total_count > 0;
     } catch (error) {
-        console.error('GitHub check error:', error.message);
+        console.error('GitHub check error:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack
+        });
         return false;
     }
 }
